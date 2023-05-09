@@ -13,11 +13,13 @@ The Jaccard index is defined as:
 The intersecting elements of A and B found by building and minimizing  
 a cost matrix whose elements are:
 
-    C_{i,j} =
-        \\begin{cases}
-            \\|A_i - B_j\\|  & \\text{if all } A_{i,k} - B_{j,k} < d_k \\\\
-            \\infty           & \\text{otherwise}
-        \\end{cases}
+```math
+C_{i,j} =
+\\begin{cases}
+\\left\\| A_{i,:} - B_{j,:} \\right\\| & \\text{if all } A_{i,k} - B_{j,k} < d_k \\\\
+\\infty & \\text{otherwise}
+\\end{cases}
+```
 
 where d is a vector of cutoff values for each dimension of the data.
 
