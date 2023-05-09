@@ -1,6 +1,6 @@
 # SMLMMetrics.jl
 
-SMLMMetrics is a Julia package for analyzing single molecule super-resolution data. It provides metrics and tools to evaluate the quality of your super-resolution microscopy data, allowing you to compare different imaging techniques and processing methods.
+SMLMMetrics is a Julia package for analyzing single molecule super-resolution data. It provides metrics to evaluate the accuracy and precision of your SMLM coordinate data. 
 
 [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://JuliaSMLM.github.io/SMLMMetrics.jl/stable/)
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://JuliaSMLM.github.io/SMLMMetrics.jl/dev/)
