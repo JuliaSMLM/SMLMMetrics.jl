@@ -1,5 +1,6 @@
 using SMLMMetrics
 using Test
+using SMLMData
 
 @testset "SMLMMetrics.jl" begin
     a = [1 2 3; 4 5 6]
@@ -31,4 +32,8 @@ using Test
         assignment_no_match = SMLMMetrics.match(a, c, cutoff)
         @test assignment_no_match == [1, 2, 0] # 2 matches with a large distance
     end
+
+    
+    
 end
+
