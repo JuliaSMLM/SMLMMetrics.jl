@@ -4,21 +4,22 @@
     jaccard(a, b, cutoff)
 
 Calculate the Jaccard Index between the two sets `a` and `b` 
-    using a maximum connection distance of `cutoff`.    
+using a maximum connection distance of `cutoff`.    
 
-The [Jaccard index](https://en.wikipedia.org/wiki/Jaccard_index) is defined as:
+The Jaccard index is defined as:
 
-``J(A,B) =  \\frac{|A\\capB|}{|A\\cupB|}``
+    J(A,B) =  |A ∩ B| / |A ∪ B|
 
-
-The intersecting elements of ``A`` and ``B`` found by building and minimizing  
+The intersecting elements of A and B found by building and minimizing  
 a cost matrix whose elements are:
 
-``C_{i,j} =
-  \\begin{cases}
-    ||A_i-B_j||       & \\quad \\text{if all } A_{i,k}-B_{j,k} < d_k \\\
-    \\infty & \\quad \\text{otherwise}
-  \\end{cases}``
+    C_{i,j} =
+        \\begin{cases}
+            \\|A_i - B_j\\|  & \\text{if all } A_{i,k} - B_{j,k} < d_k \\\\
+            \\infty           & \\text{otherwise}
+        \\end{cases}
+
+where d is a vector of cutoff values for each dimension of the data.
 
 """
 function jaccard(a, b, cutoff)
