@@ -33,7 +33,18 @@ using SMLMData
         @test assignment_no_match == [1, 2, 0] # 2 matches with a large distance
     end
 
-    
+    @testset "Efficiency" begin
+        α = [1.0, 2.0]
+        efficiency_value = SMLMMetrics.efficiency(a, b, cutoff, α)
+
+        # The assertion below is a placeholder, you'll need to replace it with the actual expected value
+        @test efficiency_value ≈ 0.5
+
+        efficiency_value_no_alpha = SMLMMetrics.efficiency(a, b, cutoff)
+
+        # The assertion below is a placeholder, you'll need to replace it with the actual expected value
+        @test efficiency_value_no_alpha ≈ 0.5
+    end
     
 end
 
