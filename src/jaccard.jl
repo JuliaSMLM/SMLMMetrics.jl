@@ -48,9 +48,27 @@ function jaccard(a::Array{<:Real}, b::Array{<:Real}, cutoff::Vector{<:Real})
 end
 
 """
-    function match(a::Array{<:Real}, b::Array{<:Real}, cutoff::Vector{<:Real})
+    match(a::Array{<:Real}, b::Array{<:Real}, cutoff::Vector{<:Real})
 
-Find best match between points in `a` and `b`. 
+Find the best matching pairs of points between `a` and `b` based on Euclidean distance, 
+with a specified maximum acceptable distance for each dimension defined in `cutoff`.
+
+The function uses the Hungarian algorithm to find the optimal assignment that minimizes
+the total distance between pairs. 
+
+Parameters:
+- `a` and `b` are `d` x `n` and `d` x `m` arrays, respectively, where `d` is the number of dimensions.
+- `cutoff` is a `d`-dimensional vector, specifying the maximum acceptable distance in each dimension.
+
+The function returns a `n`-dimensional vector, where the `i`th element is the index of the point in `b`
+that is matched with the `i`th point in `a`. If the `i`th point in `a` has no match in `b` (i.e., the distance
+to all points in `b` is larger than the `cutoff`), then the `i`th element of the returned vector is 0.
+
+The function uses a cost matrix approach, where the cost is the Euclidean distance between points. If the 
+distance between a pair of points exceeds the `cutoff`, the cost is set to a large value to effectively eliminate 
+that pairing from consideration. The Hungarian algorithm is then used to find the assignment that minimizes the 
+total cost. The cost matrix and the assignment are adjusted such that pairs with a cost equal to the large value 
+are unassigned (i.e., set to 0 in the assignment vector).
 
 """
 function match(a::Array{<:Real}, b::Array{<:Real}, cutoff::Vector{<:Real})
