@@ -35,7 +35,7 @@ function efficiency(a::Array{<:Real}, b::Array{<:Real}, cutoff::Vector{<:Real}, 
     matched_a = a[:, assignment .> 0]
     matched_b = b[:, assignment[assignment .> 0]]
     lateral_rmse = rmse(matched_a[1:2, :], matched_b[1:2, :], α[1:2])
-    axial_rmse = size(a, 1) == 3 ? rmse(matched_a[3, :], matched_b[3, :], α[3]) : 0.0
+    axial_rmse = size(a, 1) == 3 ? rmse(matched_a[3, :], matched_b[3, :], α[3:3]) : 0.0
 
     # Calculate the efficiency
     e_lateral = 1 - sqrt((1 - ji)^2 + α[1]^2 * lateral_rmse^2)
