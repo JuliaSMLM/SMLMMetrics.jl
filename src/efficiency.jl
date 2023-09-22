@@ -14,6 +14,7 @@ and a dimensional weighting `α` for the RMSE. The efficiency is defined as:
 Lateral and axial efficiencies are calculated separately and then averaged to obtain the overall efficiency. 
 The first two dimensions are considered lateral and the third dimension is considered axial. 
 The default alpha values are `α = 1 × 10^{-2} nm^{-1}` for lateral and `α = 0.5 × 10^{-2} nm^{-1}` for axial.
+The units of `α` should be the inverse of the units of `a` and `b`.
 
 Detection accuracy is expressed in units of 0 to 1. 
 The efficiency ranges up to 100% for a perfect fitting algorithm.
@@ -38,8 +39,8 @@ function efficiency(a::Array{<:Real}, b::Array{<:Real}, cutoff::Vector{<:Real}, 
     axial_rmse = size(a, 1) == 3 ? rmse(matched_a[3, :], matched_b[3, :], α[3:3]) : 0.0
 
     # Calculate the efficiency
-    e_lateral = 1 - sqrt((1 - ji)^2 + α[1]^2 * lateral_rmse^2)
-    e_axial = size(a, 1) == 3 ? (1 - sqrt((1 - ji)^2 + α[3]^2 * axial_rmse^2)) : 0.0
+    e_lateral = 1 - sqrt((1 - ji)^2 +2.0*lateral_rmse^2)
+    e_axial = size(a, 1) == 3 ? (1 - sqrt((1 - ji)^2 +axial_rmse^2)) : 0.0
     eff = (size(a, 1) == 3 ? (e_lateral + e_axial) / 2 : e_lateral)
 
     return eff
