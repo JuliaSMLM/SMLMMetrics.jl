@@ -38,8 +38,8 @@ function efficiency(a::Array{<:Real}, b::Array{<:Real}, cutoff::Vector{<:Real}, 
     axial_rmse = size(a, 1) == 3 ? rmse(matched_a[3, :], matched_b[3, :], α[3:3]) : 0.0
 
     # Calculate the efficiency
-    e_lateral = 1 - sqrt((1 - ji)^2 + α[1]^2 * lateral_rmse^2)
-    e_axial = size(a, 1) == 3 ? (1 - sqrt((1 - ji)^2 + α[3]^2 * axial_rmse^2)) : 0.0
+    e_lateral = 1 - sqrt((1 - ji)^2 +2.0*lateral_rmse^2)
+    e_axial = size(a, 1) == 3 ? (1 - sqrt((1 - ji)^2 +axial_rmse^2)) : 0.0
     eff = (size(a, 1) == 3 ? (e_lateral + e_axial) / 2 : e_lateral)
 
     return eff
