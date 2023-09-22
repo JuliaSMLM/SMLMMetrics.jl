@@ -14,6 +14,7 @@ and a dimensional weighting `α` for the RMSE. The efficiency is defined as:
 Lateral and axial efficiencies are calculated separately and then averaged to obtain the overall efficiency. 
 The first two dimensions are considered lateral and the third dimension is considered axial. 
 The default alpha values are `α = 1 × 10^{-2} nm^{-1}` for lateral and `α = 0.5 × 10^{-2} nm^{-1}` for axial.
+The units of `α` should be the inverse of the units of `a` and `b`.
 
 Detection accuracy is expressed in units of 0 to 1. 
 The efficiency ranges up to 100% for a perfect fitting algorithm.
