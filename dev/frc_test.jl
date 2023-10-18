@@ -33,14 +33,14 @@ function corellationradius(img1::Matrix, img2::Matrix, radius, im_width, im_heig
     return result
 end
 
-#For now I will use the 
-test_image_base  = testimage("straw_512")
+#For now I will use an image from the test image library 
+test_image_base  = rotr90(testimage("house"))
 
 test_image_base = gray.(test_image_base)
 
-
-test_image_1 = poisson(test_image_base, 250)
-test_image_2 = poisson(test_image_base, 250)
+#The noise library contains a method for adding poisson noise to an image
+test_image_1 = poisson(test_image_base, 100)
+test_image_2 = poisson(test_image_base, 100)
 
 test_image_1_fft = fftshift(fft(test_image_1))
 test_image_2_fft = fftshift(fft(test_image_2))
@@ -48,24 +48,21 @@ test_image_2_fft = fftshift(fft(test_image_2))
 ring_correlation_example = [corellationradius(test_image_1_fft, test_image_2_fft, r, 512, 512) for r in 1:256]
 
 
-fig = GLMakie.Figure()
 
-ax1 = GLMakie.Axis(fig[1,1])
-ax2 = GLMakie.Axis(fig[1,2])
-
-ax3 = GLMakie.Axis(fig[2,1])
-
-ax4 = GLMakie.Axis(fig[2,2])
+fig = GLMakie.Figure(resolution=(1000,1300))
 
 
-heatmap!(ax1, test_image_base)
-heatmap!(ax2, test_image_2)
+image(fig[1,1], test_image_1, axis = (aspect = DataAspect(), title="Image 1"))
+image(fig[1,2], test_image_2, axis = (aspect = DataAspect(), title="Image 2"))
 
+ax3 = GLMakie.Axis(fig[2,1], title = "Magnitude of Fourier Transform Image 1", aspect=DataAspect())
+ax4 = GLMakie.Axis(fig[2,2], title = "Magnitude of Fourier Transform Image 2", aspect=DataAspect())
 
 heatmap!(ax3, abs.(test_image_1_fft))
 heatmap!(ax4, abs.(test_image_2_fft))
 
-ax5 = GLMakie.Axis(fig[3, 1:2])
+ax5 = GLMakie.Axis(fig[3, 1:2], ylabel="FRC", xlabel = "Spatial Frequency (1/λ)", title="FRC vs Angular Frequency for Test Images")
 scatter!(ax5, abs2.(ring_correlation_example))
+hlines!(ax5, [1/7], linestyle = :dot)
 fig
 
