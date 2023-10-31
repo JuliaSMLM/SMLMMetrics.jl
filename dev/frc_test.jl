@@ -1,37 +1,5 @@
 using GLMakie, Distributions, FFTW, Images, Noise, TestImages
-
-"""
-Calculate the Fourier Ring Correlation at a given radius (in spatial frequency), given fourier transforms of two images
-
-
-Results are complex valued
-"""
-function corellationradius(img1::Matrix, img2::Matrix, radius, im_width, im_height)
-
-    im_x_center = Int(im_width/2)
-    im_y_center = Int(im_height/2)
-
-    numerator_sum = 0
-    denominator_sum = 0
-
-    #Computes the Fourier ring correlation at a given magnitude of spatial frequency
-    for x in 1:im_width
-        for y in 1:im_height
-            if (x - im_x_center)^2 + (y - im_y_center) ^2 == radius^2
-                numerator_sum += (img1[x,y] * conj(img2[x,y]))
-                denominator_sum += sqrt(abs2(img1[x,y]) * abs2(img2[x,y]))
-            end
-        end
-    end
-
-    result = real(numerator_sum)/denominator_sum
-
-    if isnan(result)
-        @error "Ring not defined at R = " + radius
-        return NaN
-    end
-    return result
-end
+#using SMLMMetrics
 
 #For now I will use an image from the test image library 
 test_image_base  = rotr90(testimage("brick_wall_512.tiff"))
@@ -45,9 +13,7 @@ test_image_2 = add_gauss(test_image_base, .5)
 test_image_1_fft = fftshift(fft(test_image_1))
 test_image_2_fft = fftshift(fft(test_image_2))
 
-ring_correlation_example = [corellationradius(test_image_1_fft, test_image_2_fft, r, 512, 512) for r in 1:256]
-rounded_frc = [mean(ring_correlation_example[(1 + (n-1)*8 ): n*8]) for n in 1:32]
-
+rounded_frc = SMLMMetrics.calcfrc(test_image_1, test_image_2, 8)
 
 fig = GLMakie.Figure(resolution=(1000,1300))
 
@@ -62,7 +28,7 @@ heatmap!(ax3, abs.(test_image_1_fft))
 heatmap!(ax4, abs.(test_image_2_fft))
 
 ax5 = GLMakie.Axis(fig[3, 1:2], ylabel="FRC", xlabel = "Spatial Frequency (λ^-1)", title="FRC vs Spatial Frequency for Test Images")
-scatter!(ax5, 1:8:256 , (rounded_frc))
+scatter!(ax5, 1:32:256 , (rounded_frc))
 hlines!(ax5, [1/7], linestyle = :dot)
 fig
 

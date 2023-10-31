@@ -1,3 +1,5 @@
+using FFTW, Images
+
 """
 Calculate the Fourier Ring Correlation at a given radius (in pixels), given fourier transforms of two images
 
@@ -42,20 +44,20 @@ The images are assumed to be square and the same size.
 
 """
 function calcfrc(img1::Matrix, img2::Matrix, numdatapoints::Int)
+    im_width = size(img1)[1]
+    im_height = size(img1)[2]
+    
     if size(img1) != size(img2) || size(img1)[1] != size(img1)[2]
         @error "Images must be the same size and square"
         return NaN
     end
-    
-    im_width = size(img1)[1]
-    im_height = size(img1)[2]
+  
+    if numdatapoints > Int(floor(im_width/2))
+        @error "Number of datapoints must be less than or equal to the radius of the image"
+        return NaN
+    end
 
     #Calculate the fourier transforms of the images, and shift them so that the zero frequency is in the center
-    
-    #Extract values of grayscale images, this has no effect if images are not grayscale
-    img1 = gray.(img1)
-    img2 = gray.(img2)
-
     img1_fft = fftshift(fft(img1))
     img2_fft = fftshift(fft(img2))
 
@@ -63,7 +65,7 @@ function calcfrc(img1::Matrix, img2::Matrix, numdatapoints::Int)
     full_ring_correlation = [corellationradius(img1_fft, img2_fft, r, im_width, im_height) for r in 1:Int(floor(im_width/2))]
 
     #Average the FRC to the number of datapoints specified to effectively widen the rings
-    rounded_frc = [mean(full_ring_correlation[(1 + (n-1)*Int(floor(im_width/2)/numdatapoints)): n*Int(floor(im_width/2)/numdatapoints)]) for n in 1:numdatapoints]
+    rounded_frc = [mean(full_ring_correlation[(1 + (n-1)*Int(floor((im_width/2)/numdatapoints))): n*Int(floor((im_width/2)/numdatapoints))]) for n in 1:numdatapoints]
 
     return rounded_frc
 end
