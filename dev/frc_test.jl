@@ -24,7 +24,7 @@ function corellationradius(img1::Matrix, img2::Matrix, radius, im_width, im_heig
         end
     end
 
-    result = numerator_sum/denominator_sum
+    result = real(numerator_sum)/denominator_sum
 
     if isnan(result)
         @error "Ring not defined at R = " + radius
@@ -34,19 +34,19 @@ function corellationradius(img1::Matrix, img2::Matrix, radius, im_width, im_heig
 end
 
 #For now I will use an image from the test image library 
-test_image_base  = rotr90(testimage("house"))
+test_image_base  = rotr90(testimage("lena grey"))
 
 test_image_base = gray.(test_image_base)
 
-#The noise library contains a method for adding poisson noise to an image
-test_image_1 = poisson(test_image_base, 100)
-test_image_2 = poisson(test_image_base, 100)
+#The noise library contains a method for adding noise to an image
+test_image_1 = add_gauss(test_image_base, 1)
+test_image_2 = add_gauss(test_image_base, 1)
 
 test_image_1_fft = fftshift(fft(test_image_1))
 test_image_2_fft = fftshift(fft(test_image_2))
 
 ring_correlation_example = [corellationradius(test_image_1_fft, test_image_2_fft, r, 512, 512) for r in 1:256]
-
+rounded_frc = [mean(ring_correlation_example[(1 + (n-1)*8 ): n*8]) for n in 1:32]
 
 
 fig = GLMakie.Figure(resolution=(1000,1300))
@@ -61,8 +61,8 @@ ax4 = GLMakie.Axis(fig[2,2], title = "Magnitude of Fourier Transform Image 2", a
 heatmap!(ax3, abs.(test_image_1_fft))
 heatmap!(ax4, abs.(test_image_2_fft))
 
-ax5 = GLMakie.Axis(fig[3, 1:2], ylabel="FRC", xlabel = "Spatial Frequency (1/λ)", title="FRC vs Angular Frequency for Test Images")
-scatter!(ax5, abs2.(ring_correlation_example))
+ax5 = GLMakie.Axis(fig[3, 1:2], ylabel="FRC", xlabel = "Spatial Frequency (λ^-1)", title="FRC vs Spatial Frequency for Test Images")
+scatter!(ax5, 1:8:256 , (rounded_frc))
 hlines!(ax5, [1/7], linestyle = :dot)
 fig
 

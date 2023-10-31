@@ -20,14 +20,14 @@ function corellationradius(img1::Matrix, img2::Matrix, radius, im_width, im_heig
     #Computes the Fourier ring correlation at a given magnitude of spatial frequency
     for x in 1:im_width
         for y in 1:im_height
-            if (x - im_x_center)^2 + (y - im_y_center) ^2 == radius^2
+            if ((x - im_x_center)^2 + (y - im_y_center) ^2) == radius^2
                 numerator_sum += (img1[x,y] * conj(img2[x,y]))
                 denominator_sum += sqrt(abs2(img1[x,y]) * abs2(img2[x,y]))
             end
         end
     end
 
-    result = numerator_sum/denominator_sum
+    result = real(numerator_sum)/denominator_sum
 
     if isnan(result)
         @error "Ring not defined at R = " + String(radius)
@@ -71,10 +71,10 @@ test_image_1_fft = fftshift(fft(test_image_1))
 test_image_2_fft = fftshift(fft(test_image_2))
 
 
-ring_correlation_example = [corellationradius(test_image_1_fft, test_image_2_fft, r, 2048, 2048) for r in 1:512]
+ring_correlation_example = [corellationradius(test_image_1_fft, test_image_2_fft, r, 2048, 2048) for r in 1:1028]
 
-#Next step, we will average the data, effectively widening the width of the fourier rings to 8 pixels
-rounded_frc = [mean(ring_correlation_example[(1 + (n-1)*8 ): n*8]) for n in 1:64]
+#Next step, we will average the data, effectively widening the width of the fourier rings to 16 pixels
+rounded_frc = [mean(ring_correlation_example[(1 + (n-1)*16 ): n*16]) for n in 1:64]
 
 
 fig = GLMakie.Figure(resolution=(1000,1300))
@@ -89,9 +89,8 @@ ax4 = GLMakie.Axis(fig[2,2], title = "Magnitude of Fourier Transform Image 2", a
 heatmap!(ax3, abs.(test_image_1_fft))
 heatmap!(ax4, abs.(test_image_2_fft))
 
-ax5 = GLMakie.Axis(fig[3, 1:2], ylabel="FRC", xlabel = "Spatial Frequency (1/λ)", title="FRC vs Angular Frequency for Test Images")
-scatter!(ax5, 1:8:512,abs.(rounded_frc))
-scatter!(ax5, 1:8:512, ifft(rounded_frc))
+ax5 = GLMakie.Axis(fig[3, 1:2], ylabel="FRC", xlabel = "Spatial Frequency", title="FRC vs Spatial Frequency for Test Images")
+scatter!(ax5, 1:16:1024,(rounded_frc))
 hlines!(ax5, [1/7], linestyle = :dot)
 fig
 
