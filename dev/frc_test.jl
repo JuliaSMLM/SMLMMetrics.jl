@@ -34,13 +34,13 @@ function corellationradius(img1::Matrix, img2::Matrix, radius, im_width, im_heig
 end
 
 #For now I will use an image from the test image library 
-test_image_base  = rotr90(testimage("lena grey"))
+test_image_base  = rotr90(testimage("brick_wall_512.tiff"))
 
 test_image_base = gray.(test_image_base)
 
 #The noise library contains a method for adding noise to an image
-test_image_1 = add_gauss(test_image_base, 1)
-test_image_2 = add_gauss(test_image_base, 1)
+test_image_1 = add_gauss(test_image_base, .5)
+test_image_2 = add_gauss(test_image_base, .5)
 
 test_image_1_fft = fftshift(fft(test_image_1))
 test_image_2_fft = fftshift(fft(test_image_2))
