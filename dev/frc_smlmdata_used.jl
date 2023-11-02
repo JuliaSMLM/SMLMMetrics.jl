@@ -30,7 +30,7 @@ function corellationradius(img1::Matrix, img2::Matrix, radius, im_width, im_heig
     result = real(numerator_sum)/denominator_sum
 
     if isnan(result)
-        @error "Ring not defined at R = " + String(radius)
+        @error "Ring not defined at R = " + string(radius)
         return NaN
     end
     return result
@@ -48,7 +48,7 @@ Then I will split the dataset
 #This are the default values for data simulation
 smld_true, smld_model, smld_noisy = SMLMSim.sim(;
     ρ=1.0,
-    σ_PSF=0.13, #micron 
+    σ_PSF=0.3, #micron 
     minphotons=50,
     ndatasets=10,
     nframes=1000,
@@ -92,5 +92,7 @@ heatmap!(ax4, abs.(test_image_2_fft))
 ax5 = GLMakie.Axis(fig[3, 1:2], ylabel="FRC", xlabel = "Spatial Frequency", title="FRC vs Spatial Frequency for Test Images")
 scatter!(ax5, 1:16:1024,(rounded_frc))
 hlines!(ax5, [1/7], linestyle = :dot)
-fig
+
+GLMakie.activate!(inline=false)
+display(fig)
 
