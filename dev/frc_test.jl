@@ -1,19 +1,28 @@
-using GLMakie, Distributions, FFTW, Images, Noise, TestImages
+using GLMakie, Distributions, FFTW, Images, Noise, TestImages, ImageFiltering
 #using SMLMMetrics
 
 #For now I will use an image from the test image library 
-test_image_base  = rotr90(testimage("brick_wall_512.tiff"))
+test_image_base  = rotr90(testimage("house.tif"))
 
 test_image_base = gray.(test_image_base)
 
-#The noise library contains a method for adding noise to an image
-test_image_1 = add_gauss(test_image_base, .5)
-test_image_2 = add_gauss(test_image_base, .5)
+#Smoothing image before adding noise causes correlation to decrease at lower frequencies
+test_image_base = imfilter(test_image_base, Kernel.gaussian(3))
 
+#The noise library contains a method for adding noise to an image
+test_image_1 = add_gauss(test_image_base, 1)
+test_image_2 = add_gauss(test_image_base, 1)
+
+#=
+#Smoothing image after adding noise causes correlation to increase at high frequency values (mostly zero)
+
+test_image_1 = imfilter(test_image_1, Kernel.gaussian(1))
+test_image_2 = imfilter(test_image_2, Kernel.gaussian(1))
+=#
 test_image_1_fft = fftshift(fft(test_image_1))
 test_image_2_fft = fftshift(fft(test_image_2))
 
-rounded_frc = SMLMMetrics.calcfrc(test_image_1, test_image_2, 8)
+rounded_frc = SMLMMetrics.calcfrc(test_image_1, test_image_2, 32)
 
 fig = GLMakie.Figure(resolution=(1000,1300))
 
@@ -28,7 +37,7 @@ heatmap!(ax3, abs.(test_image_1_fft))
 heatmap!(ax4, abs.(test_image_2_fft))
 
 ax5 = GLMakie.Axis(fig[3, 1:2], ylabel="FRC", xlabel = "Spatial Frequency (λ^-1)", title="FRC vs Spatial Frequency for Test Images")
-scatter!(ax5, 1:32:256 , (rounded_frc))
+scatter!(ax5, 1:8:256 , (rounded_frc))
 hlines!(ax5, [1/7], linestyle = :dot)
 fig
 
