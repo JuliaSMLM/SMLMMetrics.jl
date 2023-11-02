@@ -1,5 +1,5 @@
 using GLMakie, Distributions, FFTW, Images, Noise, TestImages, ImageFiltering
-#using SMLMMetrics
+include("../src/SMLMMetrics.jl")
 
 #For now I will use an image from the test image library 
 test_image_base  = rotr90(testimage("house.tif"))
@@ -7,20 +7,17 @@ test_image_base  = rotr90(testimage("house.tif"))
 test_image_base = gray.(test_image_base)
 
 #Smoothing image before adding noise causes correlation to decrease at lower frequencies
-test_image_base = imfilter(test_image_base, Kernel.gaussian(3))
+test_image_base = imfilter(test_image_base, Kernel.gaussian(1))
 
 #The noise library contains a method for adding noise to an image
-test_image_1 = add_gauss(test_image_base, 1)
-test_image_2 = add_gauss(test_image_base, 1)
+test_image_1 = add_gauss(test_image_base, .5)
+test_image_2 = add_gauss(test_image_base, .5)
 
-#=
+
 #Smoothing image after adding noise causes correlation to increase at high frequency values (mostly zero)
 
 test_image_1 = imfilter(test_image_1, Kernel.gaussian(1))
 test_image_2 = imfilter(test_image_2, Kernel.gaussian(1))
-=#
-test_image_1_fft = fftshift(fft(test_image_1))
-test_image_2_fft = fftshift(fft(test_image_2))
 
 rounded_frc = SMLMMetrics.calcfrc(test_image_1, test_image_2, 32)
 

@@ -1,48 +1,13 @@
 using GLMakie, Distributions, FFTW, Images, Noise, TestImages, SMLMData, SMLMSim
+include("../src/SMLMMetrics.jl")
 
 #TODO: Implement SMLMVis
 #TODO: Replace with Keywords
 
 """
-Calculate the Fourier Ring Correlation at a given radius (in spatial frequency), given fourier transforms of two images
-
-
-Results are complex valued
-"""
-function corellationradius(img1::Matrix, img2::Matrix, radius, im_width, im_height)
-
-    im_x_center = Int(im_width/2)
-    im_y_center = Int(im_height/2)
-
-    numerator_sum = 0
-    denominator_sum = 0
-
-    #Computes the Fourier ring correlation at a given magnitude of spatial frequency
-    for x in 1:im_width
-        for y in 1:im_height
-            if ((x - im_x_center)^2 + (y - im_y_center) ^2) == radius^2
-                numerator_sum += (img1[x,y] * conj(img2[x,y]))
-                denominator_sum += sqrt(abs2(img1[x,y]) * abs2(img2[x,y]))
-            end
-        end
-    end
-
-    result = real(numerator_sum)/denominator_sum
-
-    if isnan(result)
-        @error "Ring not defined at R = " + string(radius)
-        return NaN
-    end
-    return result
-end
-
-
-"""
 To test this FRC Ring correlation method, I will generate data using SMLMSim, then images from the SMLMData packages, in the future I will implement the SMLMVis package
 
 Then I will split the dataset
-
-
 """
 
 #This are the default values for data simulation
@@ -66,16 +31,8 @@ smld_noisy_2 = SMLMData.isolatesmld(smld_noisy, Int(round(length(smld_noisy)/2))
 test_image_1 = SMLMData.gaussim(smld_noisy_1, .1; pxsize_out = 0.0125)
 test_image_2 = SMLMData.gaussim(smld_noisy_2, .1; pxsize_out = 0.0125)
 
-#Now I will take the Fourier Transform of both images
-test_image_1_fft = fftshift(fft(test_image_1))
-test_image_2_fft = fftshift(fft(test_image_2))
 
-
-ring_correlation_example = [corellationradius(test_image_1_fft, test_image_2_fft, r, 2048, 2048) for r in 1:1028]
-
-#Next step, we will average the data, effectively widening the width of the fourier rings to 16 pixels
-rounded_frc = [mean(ring_correlation_example[(1 + (n-1)*16 ): n*16]) for n in 1:64]
-
+rounded_frc = SMLMMetrics.calcfrc(test_image_1, test_image_2, 64)
 
 fig = GLMakie.Figure(resolution=(1000,1300))
 
