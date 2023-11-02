@@ -53,7 +53,7 @@ function calcfrc(img1::Matrix, img2::Matrix, numdatapoints::Int)
     end
   
     if numdatapoints > Int(floor(im_width/2))
-        @error "Number of datapoints must be less than or equal to the radius of the image"
+        @error "Number of datapoints must be less than or equal to the width of the image"
         return NaN
     end
 

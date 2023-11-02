@@ -13,7 +13,7 @@ Then I will split the dataset
 #This are the default values for data simulation
 smld_true, smld_model, smld_noisy = SMLMSim.sim(;
     ρ=1.0,
-    σ_PSF=0.3, #micron 
+    σ_PSF=0.13, #micron 
     minphotons=50,
     ndatasets=10,
     nframes=1000,
@@ -28,11 +28,11 @@ smld_noisy_1 = SMLMData.isolatesmld(smld_noisy, 1:Int(round(length(smld_noisy)/2
 smld_noisy_2 = SMLMData.isolatesmld(smld_noisy, Int(round(length(smld_noisy)/2)):Int(length(smld_noisy)))
 
 #Generating test images of size 2056,2056
-test_image_1 = SMLMData.gaussim(smld_noisy_1, .1; pxsize_out = 0.0125)
-test_image_2 = SMLMData.gaussim(smld_noisy_2, .1; pxsize_out = 0.0125)
+test_image_1 = SMLMData.gaussim(smld_noisy_1, .1; pxsize_out = 0.025)
+test_image_2 = SMLMData.gaussim(smld_noisy_2, .1; pxsize_out = 0.025)
 
 
-rounded_frc = SMLMMetrics.calcfrc(test_image_1, test_image_2, 64)
+rounded_frc = SMLMMetrics.calcfrc(test_image_1, test_image_2, 32)
 
 fig = GLMakie.Figure(resolution=(1000,1300))
 
@@ -47,7 +47,7 @@ heatmap!(ax3, abs.(test_image_1_fft))
 heatmap!(ax4, abs.(test_image_2_fft))
 
 ax5 = GLMakie.Axis(fig[3, 1:2], ylabel="FRC", xlabel = "Spatial Frequency", title="FRC vs Spatial Frequency for Test Images")
-scatter!(ax5, 1:16:1024,(rounded_frc))
+scatter!(ax5, 1:16:512,(rounded_frc))
 hlines!(ax5, [1/7], linestyle = :dot)
 
 GLMakie.activate!(inline=false)
