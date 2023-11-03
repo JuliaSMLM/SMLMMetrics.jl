@@ -19,6 +19,9 @@ test_image_2 = add_gauss(test_image_base, .5)
 test_image_1 = imfilter(test_image_1, Kernel.gaussian(1))
 test_image_2 = imfilter(test_image_2, Kernel.gaussian(1))
 
+test_image_1_fft = fftshift(fft(test_image_1))
+test_image_2_fft = fftshift(fft(test_image_2))
+
 rounded_frc = SMLMMetrics.calcfrc(test_image_1, test_image_2, 32)
 
 fig = GLMakie.Figure(resolution=(1000,1300))

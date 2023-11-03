@@ -3,8 +3,7 @@ using FFTW, Images
 """
 Calculate the Fourier Ring Correlation at a given radius (in pixels), given fourier transforms of two images
 
-
-Results are complex valued
+Returns real part of the FRC
 """
 function corellationradius(img1::Matrix, img2::Matrix, radius, im_width, im_height)
 

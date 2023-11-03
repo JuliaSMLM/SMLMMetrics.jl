@@ -31,6 +31,9 @@ smld_noisy_2 = SMLMData.isolatesmld(smld_noisy, Int(round(length(smld_noisy)/2))
 test_image_1 = SMLMData.gaussim(smld_noisy_1, .1; pxsize_out = 0.025)
 test_image_2 = SMLMData.gaussim(smld_noisy_2, .1; pxsize_out = 0.025)
 
+#Taking the fft's of both images for graphing
+test_image_1_fft = fftshift(fft(test_image_1))
+test_image_2_fft = fftshift(fft(test_image_2))
 
 rounded_frc = SMLMMetrics.calcfrc(test_image_1, test_image_2, 32)
 
@@ -52,4 +55,3 @@ hlines!(ax5, [1/7], linestyle = :dot)
 
 GLMakie.activate!(inline=false)
 display(fig)
-
