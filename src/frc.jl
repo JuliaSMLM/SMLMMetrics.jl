@@ -17,8 +17,8 @@ function corellationradius(img1::Matrix, img2::Matrix, radius, im_width, im_heig
     for x in 1:im_width
         for y in 1:im_height
             if ((x - im_x_center)^2 + (y - im_y_center) ^2) == radius^2
-                numerator_sum += (img1[x,y] * conj(img2[x,y]))
-                denominator_sum += sqrt(abs2(img1[x,y]) * abs2(img2[x,y]))
+                numerator_sum += (img1[y,x] * conj(img2[y,x]))
+                denominator_sum += sqrt(abs2(img1[y,x]) * abs2(img2[y,x]))
             end
         end
     end
@@ -43,8 +43,8 @@ The images are assumed to be square and the same size.
 
 """
 function calcfrc(img1::Matrix, img2::Matrix, numdatapoints::Int)
-    im_width = size(img1)[1]
-    im_height = size(img1)[2]
+    im_width = size(img1)[2]
+    im_height = size(img1)[1]
     
     if size(img1) != size(img2) || size(img1)[1] != size(img1)[2]
         @error "Images must be the same size and square"
