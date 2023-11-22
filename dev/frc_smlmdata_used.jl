@@ -35,7 +35,7 @@ test_image_2 = SMLMData.gaussim(smld_noisy_2, .1; pxsize_out = 0.025)
 test_image_1_fft = fftshift(fft(test_image_1))
 test_image_2_fft = fftshift(fft(test_image_2))
 
-rounded_frc = SMLMMetrics.calcfrc(test_image_1, test_image_2, 32)
+frc = SMLMMetrics.calcfrc(test_image_1, test_image_2)
 
 fig = GLMakie.Figure(resolution=(1000,1300))
 
@@ -50,7 +50,7 @@ heatmap!(ax3, abs.(test_image_1_fft))
 heatmap!(ax4, abs.(test_image_2_fft))
 
 ax5 = GLMakie.Axis(fig[3, 1:2], ylabel="FRC", xlabel = "Spatial Frequency", title="FRC vs Spatial Frequency for Test Images")
-scatter!(ax5, 1:16:512,(rounded_frc))
+scatter!(ax5, (rounded_frc))
 hlines!(ax5, [1/7], linestyle = :dot)
 
 GLMakie.activate!(inline=false)

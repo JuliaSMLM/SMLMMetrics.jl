@@ -22,7 +22,7 @@ test_image_2 = imfilter(test_image_2, Kernel.gaussian(1))
 test_image_1_fft = fftshift(fft(test_image_1))
 test_image_2_fft = fftshift(fft(test_image_2))
 
-radii, frc = SMLMMetrics.calcfrc(test_image_1, test_image_2, ringextension = 1)
+frc = SMLMMetrics.calcfrc(test_image_1, test_image_2)
 
 fig = GLMakie.Figure(resolution=(1000,1300))
 
@@ -37,7 +37,7 @@ heatmap!(ax3, abs.(test_image_1_fft))
 heatmap!(ax4, abs.(test_image_2_fft))
 
 ax5 = GLMakie.Axis(fig[3, 1:2], ylabel="FRC", xlabel = "Spatial Frequency (λ^-1)", title="FRC vs Spatial Frequency for Test Images")
-scatter!(ax5, radii, frc)
+scatter!(ax5, 1:256, frc)
 hlines!(ax5, [1/7], linestyle = :dot)
 fig
 
