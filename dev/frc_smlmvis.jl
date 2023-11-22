@@ -41,7 +41,7 @@ test_image_2 = gray.(test_image_2)
 test_image_1 = parent(test_image_1)
 test_image_2 = parent(test_image_2)
 
-frc = SMLMMetrics.calcfrc(test_image_1, test_image_2, ringwidth = 2)
+frc = SMLMMetrics.calcfrc(test_image_1, test_image_2, 3)
 
 test_image_1_fft = fftshift(fft(test_image_1))
 test_image_2_fft = fftshift(fft(test_image_2))

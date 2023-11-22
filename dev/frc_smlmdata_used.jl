@@ -13,10 +13,10 @@ Then I will split the dataset
 #This are the default values for data simulation
 smld_true, smld_model, smld_noisy = SMLMSim.sim(;
     ρ=1.0,
-    σ_PSF=0.13, #micron 
+    σ_PSF=0.1, #micron 
     minphotons=50,
     ndatasets=10,
-    nframes=1000,
+    nframes=500,
     framerate=50.0, # 1/s
     pattern=SMLMSim.Nmer2D(),
     molecule=SMLMSim.GenericFluor(; q=[0 50; 1e-2 0]), #1/s 
@@ -50,7 +50,7 @@ heatmap!(ax3, abs.(test_image_1_fft))
 heatmap!(ax4, abs.(test_image_2_fft))
 
 ax5 = GLMakie.Axis(fig[3, 1:2], ylabel="FRC", xlabel = "Spatial Frequency", title="FRC vs Spatial Frequency for Test Images")
-scatter!(ax5, (rounded_frc))
+scatter!(ax5, frc)
 hlines!(ax5, [1/7], linestyle = :dot)
 
 GLMakie.activate!(inline=false)
