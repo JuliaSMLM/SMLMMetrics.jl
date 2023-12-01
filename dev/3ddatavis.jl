@@ -24,12 +24,15 @@ smld_true, smld_model, smld_noisy = SMLMSim.sim(;
 )
 
 #The next step is to create a histogram using the coordinates. Each datapoint specifies a number of photons at a location
-#First I will create a square shaped array
+
+#First I will create a cuboid shaped array
 gen_data_x_max = maximum(smld_noisy.x)
 gen_data_x_min = minimum(smld_noisy.x)
 
 gen_data_y_max = maximum(smld_noisy.y)
 gen_data_y_min = minimum(smld_noisy.y)
+
+#Convert to units of z pixels
 
 gen_data_z_max = maximum(smld_noisy.z)
 gen_data_z_min = minimum(smld_noisy.z)
