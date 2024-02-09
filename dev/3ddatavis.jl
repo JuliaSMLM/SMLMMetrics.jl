@@ -1,5 +1,8 @@
 using GLMakie, Distributions, FFTW, Images, Noise, SMLMData, SMLMSim, SMLMVis
 
+#Skeleton for function to create histogram 
+
+
 xpixels = 256
 ypixels = 256
 zpixels = 128
@@ -25,14 +28,52 @@ smld_true, smld_model, smld_noisy = SMLMSim.sim(;
 
 #The next step is to create a histogram using the coordinates. Each datapoint specifies a number of photons at a location
 
-#First I will create a cuboid shaped array
-gen_data_x_max = maximum(smld_noisy.x)
-gen_data_x_min = minimum(smld_noisy.x)
+#First I will create a rectangular shaped 3D array of the size 256, 256, 128 
+#Scale x and y coordinates to sizes in microns
+smld_noisy.x .= smld_noisy.x .* xypixelsize
+smld_noisy.y .= smld_noisy.y .* xypixelsize
 
-gen_data_y_max = maximum(smld_noisy.y)
-gen_data_y_min = minimum(smld_noisy.y)
 
-#Convert to units of z pixels
+#For now the bin size corresponds to the size of the pixels in the x and y direction
+xybinsize = 0.1 
+zbinsize = 0.2 
+xyarraysize = 256
+zarraysize = 128
 
-gen_data_z_max = maximum(smld_noisy.z)
-gen_data_z_min = minimum(smld_noisy.z)
+max = minimum(smld_noisy.x)
+
+hist_array = zeros(xyarraysize, xyarraysize, zarraysize)
+#Iterate through the coordinates and add the number of photons to the corresponding bin
+for i in 1:length(smld_noisy)
+    xbin = 0
+    ybin = 0
+    zbin = 0
+
+    if smld_noisy.x[i] < 0
+        xbin = 1
+    elseif smld_noisy.x[i] > 25.6
+        xbin = 256
+    else 
+        xbin = Int(floor(smld_noisy.x[i] / xybinsize)) + 1
+    end
+
+    if smld_noisy.y[i] < 0
+        ybin = 1
+    elseif smld_noisy.y[i] > 25.6
+        ybin = 256
+    else 
+        ybin = Int(floor(smld_noisy.y[i] / xybinsize)) + 1
+    end
+
+    if smld_noisy.z[i] < 0
+        zbin = 1
+    elseif smld_noisy.z[i] > 25.6
+        zbin = 128
+    else 
+        zbin = Int(floor(smld_noisy.z[i] / zbinsize)) + 1
+    end
+
+    hist_array[xbin, ybin, zbin] += smld_noisy.photons[i]
+end
+
+hist_array
