@@ -11,5 +11,6 @@ include("rmse.jl")
 include("efficiency.jl")
 include("smlmdata.jl")
 
+export jaccard, match, rmse, efficiency
 
 end
