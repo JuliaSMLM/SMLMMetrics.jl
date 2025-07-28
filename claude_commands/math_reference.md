@@ -43,7 +43,7 @@ For 3D data: $\mathbf{a}_i = [x_i, y_i, z_i]^T$
 - Lateral dimensions (x, y): $\alpha_{lateral} = 1 \times 10^{-2}$ nm⁻¹
 - Axial dimension (z): $\alpha_{axial} = 0.5 \times 10^{-2}$ nm⁻¹
 
-These values reflect the typical precision differences between lateral and axial localization in 3D SMLM.
+These values reflect the typical precision differences between lateral and axial localization in 3D SMLM.fr
 
 ## Chenouard et al. Five-Metric Framework
 
