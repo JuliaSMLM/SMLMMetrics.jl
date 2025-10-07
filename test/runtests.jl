@@ -45,6 +45,9 @@ using SMLMData
         # The assertion below is a placeholder, you'll need to replace it with the actual expected value
         @test efficiency_value_no_alpha ≈ 0.5
     end
-    
+
+    # Include tracking tests
+    include("test_tracking.jl")
+
 end
 

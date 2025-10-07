@@ -25,3 +25,29 @@ Manifest.toml
 
 .vscode/*
 build/*
+
+# Ignore PDF files
+*.pdf
+
+# Ignore image files
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.bmp
+*.tiff
+*.ico
+
+# Ignore video files
+*.mp4
+*.avi
+*.mov
+*.wmv
+*.flv
+*.mkv
+*.webm
+*.mpeg
+*.mpg
+*.3gp
+*.m4v
