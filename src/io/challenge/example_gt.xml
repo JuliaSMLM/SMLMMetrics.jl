@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<TrackContestISBI2012>
+  <!-- Track 1: Particle moving horizontally -->
+  <particle nSpots="5">
+    <detection t="0" x="10.0" y="20.0" z="0.0" />
+    <detection t="1" x="11.5" y="20.2" z="0.0" />
+    <detection t="2" x="13.1" y="20.1" z="0.0" />
+    <detection t="3" x="14.8" y="20.3" z="0.0" />
+    <detection t="4" x="16.2" y="20.0" z="0.0" />
+  </particle>
+
+  <!-- Track 2: Particle moving diagonally -->
+  <particle nSpots="6">
+    <detection t="0" x="50.0" y="50.0" z="0.0" />
+    <detection t="1" x="51.2" y="51.1" z="0.0" />
+    <detection t="2" x="52.5" y="52.3" z="0.0" />
+    <detection t="3" x="53.8" y="53.6" z="0.0" />
+    <detection t="4" x="55.0" y="54.8" z="0.0" />
+    <detection t="5" x="56.3" y="56.0" z="0.0" />
+  </particle>
+
+  <!-- Track 3: Stationary particle -->
+  <particle nSpots="4">
+    <detection t="1" x="100.0" y="75.0" z="0.0" />
+    <detection t="2" x="100.1" y="75.0" z="0.0" />
+    <detection t="3" x="100.0" y="75.1" z="0.0" />
+    <detection t="4" x="100.1" y="75.0" z="0.0" />
+  </particle>
+</TrackContestISBI2012>
