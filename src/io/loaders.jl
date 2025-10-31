@@ -6,7 +6,6 @@ all output Trajectory/Tracks types.
 """
 
 using MAT
-using LightXML
 
 # Import types from tracking module
 using ..Tracking: Trajectory, Tracks
@@ -161,128 +160,151 @@ function get_valid_indices(s::Dict, complex_indices::Dict{String, Vector{Int}})
 end
 
 """
-    load_tracks(::ChallengeFormat, filepath::String; pixel_size=0.1, dt=0.01)
+    load_tracks(::UTrackFormat, filepath::String; varname="tracksFinal", dt=0.01, flatten_compound=true)
 
-Load Particle Tracking Challenge ground truth XML and convert to Tracks format.
+Load u-track tracking data and convert to Tracks format.
 
 # Arguments
-- `format::ChallengeFormat`: Format specifier
-- `filepath::String`: Path to the XML file
-- `pixel_size::Float64`: Pixel size in μm (default: 0.1)
+- `format::UTrackFormat`: Format specifier
+- `filepath::String`: Path to the .mat file
+- `varname::String`: Variable name in .mat file (default: "tracksFinal")
 - `dt::Float64`: Time between frames in seconds (default: 0.01)
+- `flatten_compound::Bool`: Split compound tracks into simple tracks (default: true)
 
 # Returns
-- `Tracks`: Tracking dataset with ground truth trajectories
+- `Tracks`: Tracking dataset with trajectories
 
 # Example
 ```julia
-gt_tracks = load_tracks(ChallengeFormat(), "data/ground_truth.xml", pixel_size=0.107)
+tracks = load_tracks(UTrackFormat(), "data/tracksFinal.mat")
+tracks_3d = load_tracks(UTrackFormat(), "data/tracksFinal_3d.mat", dt=0.005)
 ```
 
-# XML Format
-The expected XML structure is:
-```xml
-<?xml version="1.0"?>
-<TrackContestISBI2012>
-  <particle nSpots="N">
-    <detection t="0" x="10.5" y="20.3" z="0.0" />
-    ...
-  </particle>
-</TrackContestISBI2012>
-```
+# Notes
+- u-track stores compound tracks that may include merging/splitting events
+- Setting `flatten_compound=true` splits these into simple tracks (recommended)
+- Gap frames (NaN values) are skipped
+- Coordinates are assumed to be in microns
 """
-function load_tracks(::ChallengeFormat, filepath::String; pixel_size::Float64=0.1, dt::Float64=0.01)
-    if !isfile(filepath)
-        error("File not found: $filepath")
+function load_tracks(::UTrackFormat, filepath::String; varname::String="tracksFinal", dt::Float64=0.01, flatten_compound::Bool=true)
+    # Load MATLAB file
+    mat_data = matread(filepath)
+
+    if !haskey(mat_data, varname)
+        error("Variable '$varname' not found in $filepath")
     end
 
-    # Parse XML
-    xdoc = parse_file(filepath)
-    xroot = root(xdoc)
+    tracksFinal = mat_data[varname]
 
-    # Storage for trajectories
+    # Initialize trajectory storage
     all_trajectories = Trajectory[]
     track_id = 1
+    n_compound_tracks = length(tracksFinal)
+
+    # Determine if data is 3D by checking first valid track
+    is_3d = false
+    for compound_track in tracksFinal
+        if haskey(compound_track, "tracksCoordAmpCG")
+            coords_amp = vec(compound_track["tracksCoordAmpCG"])
+            if !isempty(coords_amp)
+                # Check if z-coordinates are non-zero
+                track_matrix = reshape(coords_amp, 8, :)'
+                if any(abs.(track_matrix[:, 3]) .> 1e-10)
+                    is_3d = true
+                end
+                break
+            end
+        end
+    end
 
     max_frame = 0
     min_frame = typemax(Int)
-    is_3d = false
 
-    # Iterate through particles (tracks)
-    for particle_elem in child_elements(xroot)
-        if name(particle_elem) != "particle"
+    # Process each compound track
+    for compound_track in tracksFinal
+        if !haskey(compound_track, "tracksCoordAmpCG") || !haskey(compound_track, "tracksFeatIndxCG")
+            @warn "Compound track missing required fields, skipping"
             continue
         end
 
-        # Storage for this trajectory
-        frames = Int[]
-        x_coords = Float64[]
-        y_coords = Float64[]
-        z_coords = Float64[]
-        has_z = false
+        coords_amp = vec(compound_track["tracksCoordAmpCG"])
+        track_matrix = reshape(coords_amp, 8, :)'  # n_frames × 8
 
-        # Iterate through detections in this track
-        for detection_elem in child_elements(particle_elem)
-            if name(detection_elem) != "detection"
-                continue
-            end
-
-            # Extract attributes
-            t_str = attribute(detection_elem, "t")
-            x_str = attribute(detection_elem, "x")
-            y_str = attribute(detection_elem, "y")
-            z_str = attribute(detection_elem, "z")
-
-            if t_str === nothing || x_str === nothing || y_str === nothing
-                @warn "Detection missing required attributes (t, x, y), skipping"
-                continue
-            end
-
-            # Parse coordinates (in pixels)
-            frame = parse(Int, t_str)
-            x_pixel = parse(Float64, x_str)
-            y_pixel = parse(Float64, y_str)
-
-            # Convert to 1-indexed and microns
-            frame_1idx = frame + 1  # Convert 0-indexed to 1-indexed
-            x_micron = x_pixel * pixel_size
-            y_micron = y_pixel * pixel_size
-
-            push!(frames, frame_1idx)
-            push!(x_coords, x_micron)
-            push!(y_coords, y_micron)
-
-            # Check for z coordinate
-            if z_str !== nothing
-                z_pixel = parse(Float64, z_str)
-                z_micron = z_pixel * pixel_size
-                push!(z_coords, z_micron)
-                has_z = true
-                is_3d = true
-            end
-
-            # Track min/max frame
-            max_frame = max(max_frame, frame_1idx)
-            min_frame = min(min_frame, frame_1idx)
+        feat_indx = compound_track["tracksFeatIndxCG"]
+        if ndims(feat_indx) == 1
+            feat_indx = reshape(feat_indx, 1, :)
         end
 
-        # Create trajectory if it has positions
-        if !isempty(frames)
-            traj = Trajectory(
-                id=track_id,
-                frames=frames,
-                x=x_coords,
-                y=y_coords,
-                z=has_z ? z_coords : nothing,
-                dt=dt
-            )
-            push!(all_trajectories, traj)
-            track_id += 1
+        # Get sequence of events for frame timing
+        first_frame_offsets = ones(Int, size(feat_indx, 1))
+        if haskey(compound_track, "seqOfEvents")
+            seq_events = compound_track["seqOfEvents"]
+            for subtrack_idx in 1:size(feat_indx, 1)
+                for row_idx in 1:size(seq_events, 1)
+                    if Int(seq_events[row_idx, 2]) == 1 && Int(seq_events[row_idx, 3]) == subtrack_idx
+                        first_frame_offsets[subtrack_idx] = Int(seq_events[row_idx, 1])
+                        break
+                    end
+                end
+            end
+        end
+
+        if flatten_compound
+            # Split compound track into simple tracks
+            for subtrack_idx in 1:size(feat_indx, 1)
+                track_indices = feat_indx[subtrack_idx, :]
+
+                frames = Int[]
+                x_coords = Float64[]
+                y_coords = Float64[]
+                z_coords = Float64[]
+
+                first_valid_frame = first_frame_offsets[subtrack_idx]
+
+                for (frame_offset, feat_idx) in enumerate(track_indices)
+                    # Skip NaN (gaps)
+                    if isnan(feat_idx) || frame_offset > size(track_matrix, 1)
+                        continue
+                    end
+
+                    x = track_matrix[frame_offset, 1]
+                    y = track_matrix[frame_offset, 2]
+                    z = track_matrix[frame_offset, 3]
+
+                    # Skip invalid positions
+                    if isnan(x) || isnan(y) || isinf(x) || isinf(y)
+                        continue
+                    end
+
+                    absolute_frame = first_valid_frame > 0 ? first_valid_frame + frame_offset - 1 : frame_offset
+
+                    push!(frames, absolute_frame)
+                    push!(x_coords, Float64(x))
+                    push!(y_coords, Float64(y))
+                    if is_3d
+                        push!(z_coords, Float64(z))
+                    end
+
+                    max_frame = max(max_frame, absolute_frame)
+                    min_frame = min(min_frame, absolute_frame)
+                end
+
+                # Create trajectory if it has positions
+                if !isempty(frames)
+                    traj = Trajectory(
+                        id=track_id,
+                        frames=frames,
+                        x=x_coords,
+                        y=y_coords,
+                        z=is_3d ? z_coords : nothing,
+                        dt=dt
+                    )
+                    push!(all_trajectories, traj)
+                    track_id += 1
+                end
+            end
         end
     end
-
-    # Free XML document
-    free(xdoc)
 
     # Handle empty case
     if isempty(all_trajectories)
@@ -292,12 +314,12 @@ function load_tracks(::ChallengeFormat, filepath::String; pixel_size::Float64=0.
 
     # Create metadata
     metadata = Dict{String,Any}(
-        "source" => "Particle Tracking Challenge",
-        "method" => "Ground Truth",
+        "source" => "u-track",
         "original_file" => filepath,
-        "pixel_size" => pixel_size,
-        "is_3d" => is_3d,
-        "n_tracks" => length(all_trajectories)
+        "flatten_compound" => flatten_compound,
+        "n_compound_tracks" => n_compound_tracks,
+        "n_tracks" => length(all_trajectories),
+        "is_3d" => is_3d
     )
 
     return Tracks(
@@ -307,6 +329,167 @@ function load_tracks(::ChallengeFormat, filepath::String; pixel_size::Float64=0.
     )
 end
 
-# TODO: Implement loaders for other formats
-# - load_tracks(::UTrackFormat, ...)
-# - load_tracks(::BNPTrackFormat, ...)
+"""
+    load_tracks(::BNPTrackFormat, filepath::String; varname="chain", dt=0.01)
+
+Load BNP-Track tracking data and convert to Tracks format.
+
+# Arguments
+- `format::BNPTrackFormat`: Format specifier
+- `filepath::String`: Path to the .mat file
+- `varname::String`: Variable name in .mat file (default: "chain")
+- `dt::Float64`: Time between frames in seconds (default: 0.01)
+
+# Returns
+- `Tracks`: Tracking dataset with trajectories
+
+# Example
+```julia
+tracks = load_tracks(BNPTrackFormat(), "data/chain.mat")
+tracks_3d = load_tracks(BNPTrackFormat(), "data/chain_3d.mat", dt=0.005)
+```
+
+# Notes
+- BNP-Track outputs MCMC chains with posterior distributions
+- This loader extracts the final sample state
+- The chain.sample.K vector assigns time points to particles (atoms)
+- Active particles are determined by chain.sample.b indicator
+- Coordinates are assumed to be in microns
+"""
+function load_tracks(::BNPTrackFormat, filepath::String; varname::String="chain", dt::Float64=0.01)
+    # Load MATLAB file
+    mat_data = matread(filepath)
+
+    if !haskey(mat_data, varname)
+        error("Variable '$varname' not found in $filepath")
+    end
+
+    chain = mat_data[varname]
+
+    # Extract chain components
+    if !haskey(chain, "params") || !haskey(chain, "sample")
+        error("Invalid BNP-Track chain structure: missing 'params' or 'sample'")
+    end
+
+    params = chain["params"]
+    sample = chain["sample"]
+
+    # Get frame timing information
+    t_mid = vec(params["t_mid"])
+    n_frames = length(t_mid)
+
+    # Extract final sample state
+    X_final = sample["X"]  # N × M matrix (timepoints × particles)
+    Y_final = sample["Y"]
+    b_final = vec(sample["b"])  # Existence indicator (1 × M)
+    K_final = vec(sample["K"])  # Atom assignment per time point (1 × N)
+
+    # Check for 3D data
+    is_3d = haskey(sample, "Z")
+    Z_final = is_3d ? sample["Z"] : nothing
+
+    n_timepoints = size(X_final, 1)
+    max_particles = size(X_final, 2)
+
+    # Filter to active particles only
+    active_particles = findall(b -> b >= 0.5, b_final)
+    n_active = length(active_particles)
+
+    if n_active == 0
+        @warn "No active particles found in BNP-Track output"
+        return Tracks(
+            trajectories=Trajectory[],
+            frame_range=(1, n_frames),
+            metadata=Dict{String,Any}(
+                "source" => "BNP-Track",
+                "original_file" => filepath,
+                "n_active_particles" => 0,
+                "is_3d" => is_3d
+            )
+        )
+    end
+
+    # Build trajectories by grouping time points by atom assignment
+    atom_timepoints = Dict{Int, Vector{Int}}()  # atom_idx => timepoints
+    for (time_idx, atom_idx) in enumerate(K_final)
+        atom_idx_int = Int(atom_idx)
+        # Check if this atom is active
+        if atom_idx_int >= 1 && atom_idx_int <= max_particles && b_final[atom_idx_int] >= 0.5
+            if !haskey(atom_timepoints, atom_idx_int)
+                atom_timepoints[atom_idx_int] = Int[]
+            end
+            push!(atom_timepoints[atom_idx_int], time_idx)
+        end
+    end
+
+    # Create trajectories
+    all_trajectories = Trajectory[]
+    for (atom_idx, timepoints) in atom_timepoints
+        sort!(timepoints)  # Ensure temporal order
+
+        frames = Int[]
+        x_coords = Float64[]
+        y_coords = Float64[]
+        z_coords = Float64[]
+
+        for time_idx in timepoints
+            x = Float64(X_final[time_idx, atom_idx])
+            y = Float64(Y_final[time_idx, atom_idx])
+
+            # Skip NaN or invalid positions
+            if isnan(x) || isnan(y) || isinf(x) || isinf(y)
+                continue
+            end
+
+            push!(frames, time_idx)
+            push!(x_coords, x)
+            push!(y_coords, y)
+
+            if is_3d
+                z = Float64(Z_final[time_idx, atom_idx])
+                push!(z_coords, z)
+            end
+        end
+
+        # Create trajectory if it has positions
+        if !isempty(frames)
+            traj = Trajectory(
+                id=atom_idx,
+                frames=frames,
+                x=x_coords,
+                y=y_coords,
+                z=is_3d ? z_coords : nothing,
+                dt=dt
+            )
+            push!(all_trajectories, traj)
+        end
+    end
+
+    # Determine frame range
+    min_frame = isempty(all_trajectories) ? 1 : minimum(minimum(t.frames) for t in all_trajectories)
+    max_frame = isempty(all_trajectories) ? n_frames : max(n_frames, maximum(maximum(t.frames) for t in all_trajectories))
+
+    # Create metadata
+    metadata = Dict{String,Any}(
+        "source" => "BNP-Track",
+        "original_file" => filepath,
+        "n_active_particles" => n_active,
+        "max_particles" => max_particles,
+        "n_tracks" => length(all_trajectories),
+        "is_3d" => is_3d
+    )
+
+    # Add chain statistics if available
+    if haskey(chain, "length")
+        metadata["chain_length"] = chain["length"]
+    end
+    if haskey(chain, "stride")
+        metadata["chain_stride"] = chain["stride"]
+    end
+
+    return Tracks(
+        trajectories=all_trajectories,
+        frame_range=(min_frame, max_frame),
+        metadata=metadata
+    )
+end

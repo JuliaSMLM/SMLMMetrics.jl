@@ -5,7 +5,6 @@ This module provides a unified interface for loading tracking data from various 
 - **SMITE**: Single Molecule Imaging Toolbox Extraordinaire (LidkeLab)
 - **u-track**: Particle tracking software (DanuserLab)
 - **BNP-Track**: Bayesian Nonparametric Tracking (LabPresse)
-- **Particle Tracking Challenge**: Ground truth XML format
 
 All loaders use multiple dispatch on format type tags and return Tracks objects
 containing Trajectory data.
@@ -15,11 +14,11 @@ containing Trajectory data.
 ```julia
 using SMLMMetrics
 
-# Load ground truth from Particle Tracking Challenge XML
-gt_tracks = load_tracks(ChallengeFormat(), "data/ground_truth.xml", pixel_size=0.107)
-
 # Load SMITE tracking results
 smite_tracks = load_tracks(SmiteFormat(), "results/smite_tracks.mat")
+
+# Load u-track results
+utrack_tracks = load_tracks(UTrackFormat(), "results/tracksFinal.mat")
 
 # Compare using metrics
 metrics = evaluate_tracking(gt_tracks, smite_tracks)
@@ -31,7 +30,6 @@ println("α: ", metrics.α)
 - `SmiteFormat`: Format tag for SMITE data
 - `UTrackFormat`: Format tag for u-track data
 - `BNPTrackFormat`: Format tag for BNP-Track data
-- `ChallengeFormat`: Format tag for Particle Tracking Challenge XML
 
 # Exported Functions
 - `load_tracks(format, filepath; kwargs...)`: Unified loading function with multiple dispatch
@@ -45,7 +43,7 @@ include("formats.jl")
 include("loaders.jl")
 
 # Export format types
-export SmiteFormat, UTrackFormat, BNPTrackFormat, ChallengeFormat
+export SmiteFormat, UTrackFormat, BNPTrackFormat
 
 # Export main loading function
 export load_tracks

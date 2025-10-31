@@ -45,7 +45,7 @@ julia --project=. -e "using Pkg; Pkg.update()"
   - **tracking_metrics.jl** - All 14 Chenouard performance measures implementation
 - **src/io/** - Data loading submodule
   - **IO.jl** - Module file (capitalized per convention)
-  - **formats.jl** - Format type tags (SmiteFormat, UTrackFormat, BNPTrackFormat, ChallengeFormat)
+  - **formats.jl** - Format type tags (SmiteFormat, UTrackFormat, BNPTrackFormat)
   - **loaders.jl** - Unified load_tracks() with multiple dispatch on format types
 
 ### Key Data Types
@@ -69,9 +69,8 @@ julia --project=. -e "using Pkg; Pkg.update()"
 
 ### Supported Data Formats
 - **SMITE** - Single Molecule Imaging Toolbox Extraordinaire (.mat) - implemented
-- **Challenge Format** - Particle Tracking Challenge ground truth XML - implemented
-- **u-track** - Danuser Lab tracking software (.mat) - not yet implemented
-- **BNP-Track** - Bayesian Nonparametric Tracking (.mat) - not yet implemented
+- **u-track** - Danuser Lab tracking software (.mat) - implemented
+- **BNP-Track** - Bayesian Nonparametric Tracking (.mat) - implemented
 
 ### Dependencies
 - `Hungarian` - Hungarian algorithm for optimal track pairing
@@ -118,7 +117,7 @@ Follow standard Julia package conventions. The codebase uses:
 - `frame_range` in Tracks for determining sequence length (T parameter in paper)
 
 ### Multiple Dispatch
-- `load_tracks()` uses format type tags for dispatch (SmiteFormat(), ChallengeFormat(), etc.)
+- `load_tracks()` uses format type tags for dispatch (SmiteFormat(), UTrackFormat(), BNPTrackFormat())
 - Format types are empty structs used purely for dispatch
 
 ## Quick Reference for Common Tasks
@@ -128,8 +127,11 @@ Follow standard Julia package conventions. The codebase uses:
 # Load SMITE results
 tracks = load_tracks(SmiteFormat(), "results.mat")
 
-# Load Challenge ground truth (requires pixel_size)
-gt = load_tracks(ChallengeFormat(), "gt.xml", pixel_size=0.107)
+# Load u-track results
+tracks = load_tracks(UTrackFormat(), "tracksFinal.mat")
+
+# Load BNP-Track results
+tracks = load_tracks(BNPTrackFormat(), "chain.mat")
 ```
 
 ### Evaluating Tracking

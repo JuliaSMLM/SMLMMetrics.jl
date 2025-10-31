@@ -39,15 +39,3 @@ tracks = load_tracks(BNPTrackFormat(), "path/to/chain.mat")
 ```
 """
 struct BNPTrackFormat end
-
-"""
-    ChallengeFormat
-
-Format tag for Particle Tracking Challenge ground truth XML files.
-
-# Usage
-```julia
-tracks = load_tracks(ChallengeFormat(), "path/to/ground_truth.xml")
-```
-"""
-struct ChallengeFormat end
