@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(julia --project=. -e \"using SMLMMetrics; println(\"\"✓ Module loaded successfully!\"\"); println(\"\"\\nAvailable loaders:\"\"); println(\"\"  - load_smite_2d/3d\"\"); println(\"\"  - load_utrack_2d/3d\"\"); println(\"\"  - load_bnptrack_2d/3d\"\"); println(\"\"  - load_challenge_gt (NEW!)\"\"); println(\"\"\\nGround truth loader ready for Particle Tracking Challenge XML files\"\")\")"
+      "Bash(julia --project=. -e \"using SMLMMetrics; println(\"\"✓ Module loaded successfully!\"\"); println(\"\"\\nAvailable loaders:\"\"); println(\"\"  - load_smite_2d/3d\"\"); println(\"\"  - load_utrack_2d/3d\"\"); println(\"\"  - load_bnptrack_2d/3d\"\"); println(\"\"  - load_challenge_gt (NEW!)\"\"); println(\"\"\\nGround truth loader ready for Particle Tracking Challenge XML files\"\")\")",
+      "Bash(rm:*)"
     ],
     "deny": [],
     "ask": []
