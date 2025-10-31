@@ -1,6 +1,6 @@
 # SMLMMetrics.jl
 
-SMLMMetrics is a Julia package for analyzing single molecule localization microscopy (SMLM) data. It provides metrics to evaluate the accuracy and precision of localization algorithms by comparing detected coordinates against ground truth data. 
+SMLMMetrics is a Julia package for evaluating particle tracking performance in single molecule localization microscopy (SMLM) data. It implements the comprehensive performance metrics defined in Chenouard et al., "Objective comparison of particle tracking methods", Nature Methods 11, 281-289 (2014).
 
 [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://JuliaSMLM.github.io/SMLMMetrics.jl/stable/)
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://JuliaSMLM.github.io/SMLMMetrics.jl/dev/)
@@ -9,13 +9,13 @@ SMLMMetrics is a Julia package for analyzing single molecule localization micros
 
 ## Features
 
-- **Jaccard Index**: Similarity metric based on optimal point matching using Hungarian algorithm
-- **Root Mean Square Error (RMSE)**: Positional accuracy measurement with dimensional weighting
-- **Efficiency Metric**: Combined detection rate and localization accuracy assessment
-- **Point Matching**: Optimal assignment between detected and ground truth localizations
-- **Multi-dimensional Support**: 2D and 3D localization analysis
-- **SMLMData Integration**: Native support for SMLMData.jl v0.3+ containers
-- **Flexible Data Formats**: Works with both coordinate arrays and structured data containers
+- **All 14 Chenouard Performance Measures**: Complete implementation of standardized tracking evaluation metrics
+- **Optimal Track Pairing**: Hungarian algorithm-based assignment between ground truth and estimated trajectories
+- **Gated Distance Metric**: Configurable threshold for robust trajectory comparison
+- **Unified Data Loading**: Support for SMITE, u-track, BNP-Track, and Particle Tracking Challenge formats
+- **2D and 3D Trajectories**: Single data structure with optional z-coordinate support
+- **Quality Metrics**: α (overall quality), β (quality with penalty), JSC (position-based Jaccard), JSC_θ (track-based Jaccard)
+- **Accuracy Metrics**: RMSE (position-based), RMSE_θ (track-averaged), min/max localization errors
 
 ## Installation
 
@@ -36,63 +36,116 @@ Pkg.add("SMLMMetrics")
 ```julia
 using SMLMMetrics
 
-# Example: Compare two sets of 2D localizations
-ground_truth = [1.0 2.0 3.0; 4.0 5.0 6.0]  # 2×3 matrix: 3 points in 2D
-detected = [1.05 2.05 3.05; 4.05 5.05 6.05]  # Algorithm output with small noise
+# Load ground truth and estimated tracking results
+gt_tracks = load_tracks(ChallengeFormat(), "ground_truth.xml", pixel_size=0.107)
+est_tracks = load_tracks(SmiteFormat(), "tracking_results.mat")
 
-# Set analysis parameters
-cutoff = [0.1, 0.1]    # 100 nm matching tolerance
-α = [1e-2, 1e-2]       # Dimensional weights for RMSE
+# Evaluate tracking performance
+metrics = evaluate_tracking(gt_tracks, est_tracks)
 
-# Calculate metrics
-jaccard_index = jaccard(ground_truth, detected, cutoff)
-rmse_value = rmse(ground_truth, detected, α)
-efficiency_score = efficiency(ground_truth, detected, cutoff, α)
+# Access the 14 performance measures
+println("Quality Metrics:")
+println("  α (overall quality): ", round(metrics.α, digits=3))
+println("  β (quality with penalty): ", round(metrics.β, digits=3))
 
-println("Jaccard Index: ", round(jaccard_index, digits=3))
-println("RMSE: ", round(rmse_value, digits=3), " μm")
-println("Efficiency: ", round(efficiency_score, digits=3))
+println("\nJaccard Indices:")
+println("  JSC (positions): ", round(metrics.JSC, digits=3))
+println("  JSC_θ (tracks): ", round(metrics.JSC_θ, digits=3))
+
+println("\nAccuracy Metrics:")
+println("  RMSE: ", round(metrics.RMSE, digits=3), " μm")
+println("  RMSE_θ: ", round(metrics.RMSE_θ, digits=3), " μm")
+println("  Min error: ", round(metrics.min_error, digits=3), " μm")
+println("  Max error: ", round(metrics.max_error, digits=3), " μm")
+
+println("\nCounts:")
+println("  Position level - TP: ", metrics.TP, ", FN: ", metrics.FN, ", FP: ", metrics.FP)
+println("  Track level - TP_θ: ", metrics.TP_θ, ", FN_θ: ", metrics.FN_θ, ", FP_θ: ", metrics.FP_θ)
 ```
 
-### SMLMData Integration
+### Creating Trajectories Manually
 
 ```julia
-using SMLMData, SMLMMetrics
-using SMLMData: BasicSMLD, Emitter2DFit, IdealCamera
+using SMLMMetrics
 
-# Create SMLD containers (compatible with SMLMData.jl v0.3+)
-emitters_truth = [Emitter2DFit{Float64}(1.0, 2.0, 1000.0, 10.0, 0.01, 0.01, 50.0, 2.0)]
-emitters_detected = [Emitter2DFit{Float64}(1.1, 2.1, 1000.0, 10.0, 0.01, 0.01, 50.0, 2.0)]
+# Create a 2D trajectory
+traj = Trajectory(
+    id=1,
+    frames=[1, 2, 3, 4, 5],
+    x=[0.0, 1.0, 2.0, 3.0, 4.0],
+    y=[0.0, 0.5, 1.0, 1.5, 2.0],
+    z=nothing,  # For 2D data
+    dt=0.01     # Time between frames in seconds
+)
 
-camera = IdealCamera(512, 512, 0.1)  # 512×512 pixels, 0.1 μm/pixel
-smld_truth = BasicSMLD(emitters_truth, camera, 1, 1, Dict{String,Any}())
-smld_detected = BasicSMLD(emitters_detected, camera, 1, 1, Dict{String,Any}())
+# Create a 3D trajectory
+traj_3d = Trajectory(
+    id=2,
+    frames=[1, 2, 3],
+    x=[0.0, 1.0, 2.0],
+    y=[0.0, 1.0, 2.0],
+    z=[0.0, 0.2, 0.4],  # Include z for 3D
+    dt=0.01
+)
 
-# All functions work directly with SMLD containers
-ji = jaccard(smld_truth, smld_detected, [0.05, 0.05])
-rmse_val = rmse(smld_truth, smld_detected)  # Uses default α values
-eff = efficiency(smld_truth, smld_detected, [0.05, 0.05])  # Uses default α values
+# Combine trajectories into a Tracks container
+tracks = Tracks(
+    trajectories=[traj, traj_3d],
+    frame_range=(1, 5),
+    metadata=Dict("experiment" => "test")
+)
+
+# Evaluate against another dataset
+metrics = evaluate_tracking(ground_truth_tracks, tracks)
 ```
 
-## Core Functions
+## Core Components
 
-- `jaccard(a, b, cutoff)` - Calculate Jaccard Index between two localization sets
-- `match(a, b, cutoff)` - Find optimal point assignments using Hungarian algorithm  
-- `rmse(a, b, α)` - Root Mean Square Error with dimensional weighting
-- `efficiency(a, b, cutoff, α)` - Combined efficiency metric
+### Data Types
+- **`Trajectory`**: Single particle trajectory with frame numbers, positions (x, y, z), and time step
+- **`Tracks`**: Collection of trajectories with frame range and metadata
+- **`TrackingMetrics`**: Results containing all 14 Chenouard performance measures
 
-All functions support both coordinate arrays (`d × n` matrices) and SMLMData containers.
+### Main Functions
+- **`evaluate_tracking(gt, est; gate=5.0)`**: Compute all performance metrics by comparing ground truth and estimated tracks
+- **`load_tracks(format, filepath; kwargs...)`**: Load tracking data from various formats using multiple dispatch
+
+### Format Types (for `load_tracks`)
+- **`SmiteFormat()`**: SMITE (Single Molecule Imaging Toolbox Extraordinaire)
+- **`UTrackFormat()`**: u-track (Danuser Lab)
+- **`BNPTrackFormat()`**: BNP-Track (Bayesian Nonparametric Tracking)
+- **`ChallengeFormat()`**: Particle Tracking Challenge ground truth XML
 
 ## Requirements
 
 - Julia ≥ 1.6
-- SMLMData.jl ≥ 0.3 (for SMLMData integration)
+- Hungarian.jl (optimal track pairing)
+- MAT.jl (MATLAB file support)
+- LightXML.jl (XML parsing for Challenge format)
 
-## Documentation
+## The 14 Chenouard Performance Measures
 
-- [**API Overview**](api.md) - Comprehensive function reference with examples
-- [**STABLE**](https://JuliaSMLM.github.io/SMLMMetrics.jl/stable/) - Documentation for the most recently tagged version
-- [**DEVELOPMENT**](https://JuliaSMLM.github.io/SMLMMetrics.jl/dev/) - Documentation for the in-development version
+SMLMMetrics implements all performance measures from the standardized tracking evaluation framework:
+
+### Primary Quality Metrics
+- **α**: Overall tracking quality (considers all matching pairs)
+- **β**: Quality with penalty for spurious tracks (penalizes false positives)
+
+### Jaccard Indices
+- **JSC**: Position-based Jaccard similarity coefficient
+- **JSC_θ**: Track-based Jaccard similarity coefficient
+
+### Accuracy Metrics
+- **RMSE**: Root mean square error over all matched positions
+- **RMSE_θ**: Track-averaged RMSE (average of per-track RMSEs)
+- **min_error**: Minimum localization error across all matched positions
+- **max_error**: Maximum localization error across all matched positions
+
+### Supporting Counts
+- **TP, FN, FP**: Position-level true positives, false negatives, false positives
+- **TP_θ, FN_θ, FP_θ**: Track-level true positives, false negatives, false positives
+
+For details on the metric definitions, see Chenouard et al., Nature Methods 11, 281-289 (2014).
 
 ## Contributing
 

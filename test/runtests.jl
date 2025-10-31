@@ -1,53 +1,77 @@
 using SMLMMetrics
 using Test
-using SMLMData
 
 @testset "SMLMMetrics.jl" begin
-    a = [1 2 3; 4 5 6]
-    b = [1 2 4; 4 5 7]
-    c = [1 2 8; 4 5 10]
-    cutoff = [1.0, 1.0]
+    @testset "Trajectory Construction" begin
+        # Test 2D trajectory
+        traj_2d = Trajectory(
+            id=1,
+            frames=[1, 2, 3],
+            x=[0.0, 1.0, 2.0],
+            y=[0.0, 1.0, 2.0],
+            z=nothing,
+            dt=0.01
+        )
+        @test traj_2d.id == 1
+        @test length(traj_2d.frames) == 3
+        @test !is_3d(traj_2d)
+        @test dimensionality(traj_2d) == 2
+        @test num_positions(traj_2d) == 3
+        @test temporal_length(traj_2d) == 3
+        @test num_gaps(traj_2d) == 0
 
-    @testset "Jaccard index" begin
-        jaccard_index = SMLMMetrics.jaccard(a, b, cutoff)
-        @test jaccard_index ≈ 2/(2 + 1 + 1) # 2 matches out of a total of 4 unique points
+        # Test 3D trajectory
+        traj_3d = Trajectory(
+            id=2,
+            frames=[1, 2, 3],
+            x=[0.0, 1.0, 2.0],
+            y=[0.0, 1.0, 2.0],
+            z=[0.0, 0.5, 1.0],
+            dt=0.01
+        )
+        @test is_3d(traj_3d)
+        @test dimensionality(traj_3d) == 3
 
-        jaccard_index_no_match = SMLMMetrics.jaccard(a, c, cutoff)
-        @test jaccard_index_no_match ≈ 0.5 # 2 matches out of a total of 4 unique points
+        # Test trajectory with gaps
+        traj_gaps = Trajectory(
+            id=3,
+            frames=[1, 2, 4, 5],  # Gap at frame 3
+            x=[0.0, 1.0, 3.0, 4.0],
+            y=[0.0, 1.0, 3.0, 4.0],
+            z=nothing,
+            dt=0.01
+        )
+        @test num_positions(traj_gaps) == 4
+        @test temporal_length(traj_gaps) == 5
+        @test num_gaps(traj_gaps) == 1
+        @test has_position(traj_gaps, 1)
+        @test has_position(traj_gaps, 2)
+        @test !has_position(traj_gaps, 3)  # Gap
+        @test has_position(traj_gaps, 4)
+
+        # Test get_position
+        pos = get_position(traj_2d, 2)
+        @test pos == [1.0, 1.0]
+        @test isnothing(get_position(traj_gaps, 3))  # Gap
     end
 
-    @testset "RMSE" begin
-        rmse_value = SMLMMetrics.rmse(a, b)
-        @test isapprox(rmse_value, sqrt(2/6), atol=1e-8) # sqrt((1^2 + 1^2)/6)
+    @testset "Tracks Construction" begin
+        traj1 = Trajectory(id=1, frames=[1,2,3], x=[0.0,1.0,2.0], y=[0.0,1.0,2.0], z=nothing, dt=0.01)
+        traj2 = Trajectory(id=2, frames=[2,3,4], x=[5.0,6.0,7.0], y=[5.0,6.0,7.0], z=nothing, dt=0.01)
 
-        α = [1.0, 2.0]
-        rmse_weighted = SMLMMetrics.rmse(a, b, α)
-        @test isapprox(rmse_weighted, sqrt((1^2 + (2*1)^2)/6), atol=1e-8) # sqrt((1^2 + (2*1)^2)/6)
+        tracks = Tracks(
+            trajectories=[traj1, traj2],
+            frame_range=(1, 4),
+            metadata=Dict{String,Any}("test" => "data")
+        )
+
+        @test num_trajectories(tracks) == 2
+        @test num_frames(tracks) == 4
+        @test total_positions(tracks) == 6
+        @test !is_3d(tracks)
+        @test tracks.metadata["test"] == "data"
     end
 
-    @testset "Match" begin
-        assignment = SMLMMetrics.match(a, b, cutoff)
-        @test assignment == [1, 2, 0]
-
-        assignment_no_match = SMLMMetrics.match(a, c, cutoff)
-        @test assignment_no_match == [1, 2, 0] # 2 matches with a large distance
-    end
-
-    @testset "Efficiency" begin
-        α = [1.0, 2.0]
-        efficiency_value = SMLMMetrics.efficiency(a, b, cutoff, α)
-
-        # The assertion below is a placeholder, you'll need to replace it with the actual expected value
-        @test efficiency_value ≈ 0.5
-
-        efficiency_value_no_alpha = SMLMMetrics.efficiency(a, b, cutoff)
-
-        # The assertion below is a placeholder, you'll need to replace it with the actual expected value
-        @test efficiency_value_no_alpha ≈ 0.5
-    end
-
-    # Include tracking tests
+    # Include tracking evaluation tests
     include("test_tracking.jl")
-
 end
-

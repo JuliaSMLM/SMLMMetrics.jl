@@ -1,4 +1,5 @@
 using LinearAlgebra
+using Statistics
 
 """
     TrackingMetrics
@@ -6,11 +7,17 @@ using LinearAlgebra
 Results of tracking performance evaluation.
 
 # Fields
+## Primary Performance Measures (14 measures from Chenouard et al. 2014)
 - `α::Float64`: Overall quality measure (0-1, higher is better)
 - `β::Float64`: Quality measure penalizing spurious tracks (0-1, higher is better)
 - `JSC::Float64`: Jaccard similarity coefficient for positions (0-1, higher is better)
 - `JSC_θ::Float64`: Jaccard similarity coefficient for tracks (0-1, higher is better)
 - `RMSE::Float64`: Root mean square error of localization (lower is better)
+- `RMSE_θ::Float64`: Track-averaged RMSE (lower is better)
+- `min_error::Float64`: Minimum localization error (lower is better)
+- `max_error::Float64`: Maximum localization error (lower is better)
+
+## Supporting Counts
 - `TP::Int`: True positive positions
 - `FN::Int`: False negative positions
 - `FP::Int`: False positive positions
@@ -20,14 +27,18 @@ Results of tracking performance evaluation.
 
 # Reference
 Supplementary Note 3, "Performance Measures" section
+Chenouard et al., Nature Methods 11, 281-289 (2014)
 """
 struct TrackingMetrics
-    # The 5 performance measures
+    # The primary performance measures
     α::Float64
     β::Float64
     JSC::Float64
     JSC_θ::Float64
     RMSE::Float64
+    RMSE_θ::Float64
+    min_error::Float64
+    max_error::Float64
 
     # Supporting counts
     TP::Int
@@ -64,13 +75,14 @@ end
 """
     compute_position_metrics(pairing)
 
-Compute position-level metrics: TP, FN, FP, JSC, and RMSE.
+Compute position-level metrics: TP, FN, FP, JSC, RMSE, RMSE_θ, min_error, max_error.
 
 # Arguments
 - `pairing::TrackPairing`: The optimal track pairing
 
 # Returns
-- `Tuple{Int, Int, Int, Float64, Float64}`: (TP, FN, FP, JSC, RMSE)
+- `Tuple{Int, Int, Int, Float64, Float64, Float64, Float64, Float64}`:
+  (TP, FN, FP, JSC, RMSE, RMSE_θ, min_error, max_error)
 
 # Algorithm
 For each paired track (X, Z*):
@@ -79,15 +91,20 @@ For each paired track (X, Z*):
 - FP: Number of positions in spurious tracks + non-matching positions in Z*
 - JSC: TP / (TP + FN + FP)
 - RMSE: sqrt(sum of squared errors in TP positions / TP)
+- RMSE_θ: Average of per-track RMSE values
+- min_error: Minimum error among all matched positions
+- max_error: Maximum error among all matched positions
 
 # Reference
-Supplementary Note 3, measures 3-6 and 11
+Supplementary Note 3, measures 3-6, 11-13
 """
 function compute_position_metrics(pairing::TrackPairing)
     TP = 0
     FN = 0
     FP = 0
     squared_errors = Float64[]
+    errors = Float64[]  # For min/max
+    per_track_squared_errors = Vector{Float64}[]  # For RMSE_θ
 
     # Process paired tracks
     for (gt_idx, est_idx) in enumerate(pairing.assignment)
@@ -99,11 +116,12 @@ function compute_position_metrics(pairing::TrackPairing)
         else
             # GT track paired with real EST track
             est_track = pairing.est_tracks[est_idx]
+            track_squared_errors = Float64[]
 
             # Check each time point
-            for t in 0:(pairing.T - 1)
-                gt_pos = get_position(gt_track, t)
-                est_pos = get_position(est_track, t)
+            for frame in pairing.frame_start:pairing.frame_end
+                gt_pos = get_position(gt_track, frame)
+                est_pos = get_position(est_track, frame)
 
                 if isnothing(gt_pos) && isnothing(est_pos)
                     # Both dummy → not counted
@@ -119,13 +137,22 @@ function compute_position_metrics(pairing::TrackPairing)
                     if positions_match(gt_pos, est_pos, pairing.gate)
                         # Matching → TP
                         TP += 1
-                        push!(squared_errors, norm(gt_pos - est_pos)^2)
+                        error = norm(gt_pos - est_pos)
+                        squared_error = error^2
+                        push!(squared_errors, squared_error)
+                        push!(errors, error)
+                        push!(track_squared_errors, squared_error)
                     else
                         # Non-matching → FN + FP
                         FN += 1
                         FP += 1
                     end
                 end
+            end
+
+            # Store per-track errors if any matches in this track
+            if !isempty(track_squared_errors)
+                push!(per_track_squared_errors, track_squared_errors)
             end
         end
     end
@@ -143,14 +170,36 @@ function compute_position_metrics(pairing::TrackPairing)
         0.0
     end
 
-    # Compute RMSE
+    # Compute RMSE (overall)
     RMSE = if TP > 0
         sqrt(sum(squared_errors) / TP)
     else
         0.0
     end
 
-    return (TP, FN, FP, JSC, RMSE)
+    # Compute RMSE_θ (track-averaged RMSE)
+    RMSE_θ = if !isempty(per_track_squared_errors)
+        # Calculate RMSE for each track, then average
+        track_rmses = [sqrt(mean(track_errs)) for track_errs in per_track_squared_errors]
+        mean(track_rmses)
+    else
+        0.0
+    end
+
+    # Compute min and max errors
+    min_error = if !isempty(errors)
+        minimum(errors)
+    else
+        0.0
+    end
+
+    max_error = if !isempty(errors)
+        maximum(errors)
+    else
+        0.0
+    end
+
+    return (TP, FN, FP, JSC, RMSE, RMSE_θ, min_error, max_error)
 end
 
 """
@@ -220,8 +269,11 @@ function compute_alpha(pairing::TrackPairing)
         return 0.0
     end
 
+    # Calculate T from frame range
+    T = pairing.frame_end - pairing.frame_start + 1
+
     # d(X, ∅) = |X| × T × ε
-    d_X_empty = n_gt * pairing.T * pairing.gate
+    d_X_empty = n_gt * T * pairing.gate
 
     # d(X, Y) from optimal pairing
     # We need to compute the actual distance for real GT tracks only
@@ -229,11 +281,11 @@ function compute_alpha(pairing::TrackPairing)
     for (i, j) in enumerate(pairing.assignment)
         if j == 0
             # Paired with dummy
-            d_X_Y += pairing.T * pairing.gate
+            d_X_Y += T * pairing.gate
         else
             # Paired with real track
             d_X_Y += track_distance(pairing.gt_tracks[i], pairing.est_tracks[j],
-                                   pairing.T, pairing.gate)
+                                   pairing.frame_start, pairing.frame_end, pairing.gate)
         end
     end
 
@@ -269,11 +321,14 @@ function compute_beta(pairing::TrackPairing)
     spurious_indices = get_spurious_tracks(pairing)
     n_spurious = length(spurious_indices)
 
+    # Calculate T from frame range
+    T = pairing.frame_end - pairing.frame_start + 1
+
     # d(X, ∅)
-    d_X_empty = n_gt * pairing.T * pairing.gate
+    d_X_empty = n_gt * T * pairing.gate
 
     # d(Ȳ, ∅)
-    d_Ybar_empty = n_spurious * pairing.T * pairing.gate
+    d_Ybar_empty = n_spurious * T * pairing.gate
 
     # Handle edge case
     if (d_X_empty + d_Ybar_empty) == 0.0
@@ -284,10 +339,10 @@ function compute_beta(pairing::TrackPairing)
     d_X_Y = 0.0
     for (i, j) in enumerate(pairing.assignment)
         if j == 0
-            d_X_Y += pairing.T * pairing.gate
+            d_X_Y += T * pairing.gate
         else
             d_X_Y += track_distance(pairing.gt_tracks[i], pairing.est_tracks[j],
-                                   pairing.T, pairing.gate)
+                                   pairing.frame_start, pairing.frame_end, pairing.gate)
         end
     end
 
@@ -297,15 +352,14 @@ function compute_beta(pairing::TrackPairing)
 end
 
 """
-    evaluate_tracking(ground_truth, estimated; gate, T)
+    evaluate_tracking(gt_tracks, est_tracks; gate)
 
 Evaluate tracking performance by comparing estimated tracks to ground truth.
 
 # Arguments
-- `ground_truth::Vector{Track}`: Ground truth tracks (X)
-- `estimated::Vector{Track}`: Estimated tracks (Y)
-- `gate::Float64`: Matching threshold in pixels (default: 5.0)
-- `T::Union{Int, Nothing}`: Sequence length (default: auto-detect from tracks)
+- `gt_tracks::Tracks`: Ground truth tracking dataset
+- `est_tracks::Tracks`: Estimated tracking dataset
+- `gate::Float64`: Matching threshold in physical units (μm, default: 5.0)
 
 # Returns
 - `TrackingMetrics`: Structure containing all performance measures
@@ -319,40 +373,94 @@ Evaluate tracking performance by comparing estimated tracks to ground truth.
 
 # Example
 ```julia
-gt = [Track(Dict(0 => [0.0, 0.0], 1 => [1.0, 1.0]))]
-est = [Track(Dict(0 => [0.1, 0.1], 1 => [1.1, 1.1]))]
-metrics = evaluate_tracking(gt, est)
+gt_tracks = load_tracks(ChallengeFormat(), "gt.xml")
+est_tracks = load_tracks(SmiteFormat(), "results.mat")
+metrics = evaluate_tracking(gt_tracks, est_tracks)
 println("JSC: ", metrics.JSC)
 println("RMSE: ", metrics.RMSE)
+println("α: ", metrics.α)
 ```
 
 # Reference
 Supplementary Note 3: Performance Measures
 Chenouard et al., Nature Methods 11, 281-289 (2014)
 """
-function evaluate_tracking(ground_truth::Vector{Track},
-                          estimated::Vector{Track};
-                          gate::Float64 = DEFAULT_GATE,
-                          T::Union{Int, Nothing} = nothing)
-    # Auto-detect T if not provided
-    if T === nothing
-        T = 0
-        for track in [ground_truth; estimated]
-            T = max(T, track.t_end + 1)
-        end
-        if T == 0
-            T = 1  # Minimum sequence length
-        end
-    end
+function evaluate_tracking(gt_tracks::Tracks, est_tracks::Tracks;
+                          gate::Float64 = DEFAULT_GATE)
+    # Determine frame range (union of both datasets)
+    frame_start = min(gt_tracks.frame_range[1], est_tracks.frame_range[1])
+    frame_end = max(gt_tracks.frame_range[2], est_tracks.frame_range[2])
 
     # Compute optimal pairing
-    pairing = optimal_pairing(ground_truth, estimated, T, gate)
+    pairing = optimal_pairing(gt_tracks.trajectories, est_tracks.trajectories,
+                             frame_start, frame_end, gate)
 
     # Compute all metrics
-    TP, FN, FP, JSC, RMSE = compute_position_metrics(pairing)
+    TP, FN, FP, JSC, RMSE, RMSE_θ, min_error, max_error = compute_position_metrics(pairing)
     TP_θ, FN_θ, FP_θ, JSC_θ = compute_track_metrics(pairing)
     α = compute_alpha(pairing)
     β = compute_beta(pairing)
 
-    return TrackingMetrics(α, β, JSC, JSC_θ, RMSE, TP, FN, FP, TP_θ, FN_θ, FP_θ)
+    return TrackingMetrics(α, β, JSC, JSC_θ, RMSE, RMSE_θ, min_error, max_error,
+                          TP, FN, FP, TP_θ, FN_θ, FP_θ)
+end
+
+"""
+    evaluate_tracking(gt_trajectories, est_trajectories; gate, frame_range)
+
+Evaluate tracking performance using trajectory vectors directly.
+
+# Arguments
+- `gt_trajectories::Vector{Trajectory}`: Ground truth trajectories
+- `est_trajectories::Vector{Trajectory}`: Estimated trajectories
+- `gate::Float64`: Matching threshold in physical units (μm, default: 5.0)
+- `frame_range::Union{Tuple{Int,Int}, Nothing}`: (start, end) frames (default: auto-detect)
+
+# Returns
+- `TrackingMetrics`: Structure containing all performance measures
+
+# Example
+```julia
+gt_trajs = [Trajectory(id=1, frames=[1,2,3], x=[0.0,1.0,2.0], y=[0.0,1.0,2.0], z=nothing, dt=0.01)]
+est_trajs = [Trajectory(id=1, frames=[1,2,3], x=[0.1,1.1,2.1], y=[0.1,1.1,2.1], z=nothing, dt=0.01)]
+metrics = evaluate_tracking(gt_trajs, est_trajs)
+```
+"""
+function evaluate_tracking(gt_trajectories::Vector{Trajectory},
+                          est_trajectories::Vector{Trajectory};
+                          gate::Float64 = DEFAULT_GATE,
+                          frame_range::Union{Tuple{Int,Int}, Nothing} = nothing)
+    # Auto-detect frame range if not provided
+    if frame_range === nothing
+        frame_start = typemax(Int)
+        frame_end = 0
+
+        for traj in [gt_trajectories; est_trajectories]
+            if !isempty(traj.frames)
+                frame_start = min(frame_start, minimum(traj.frames))
+                frame_end = max(frame_end, maximum(traj.frames))
+            end
+        end
+
+        # Handle empty case
+        if frame_start == typemax(Int)
+            frame_start = 1
+            frame_end = 1
+        end
+    else
+        frame_start, frame_end = frame_range
+    end
+
+    # Compute optimal pairing
+    pairing = optimal_pairing(gt_trajectories, est_trajectories,
+                             frame_start, frame_end, gate)
+
+    # Compute all metrics
+    TP, FN, FP, JSC, RMSE, RMSE_θ, min_error, max_error = compute_position_metrics(pairing)
+    TP_θ, FN_θ, FP_θ, JSC_θ = compute_track_metrics(pairing)
+    α = compute_alpha(pairing)
+    β = compute_beta(pairing)
+
+    return TrackingMetrics(α, β, JSC, JSC_θ, RMSE, RMSE_θ, min_error, max_error,
+                          TP, FN, FP, TP_θ, FN_θ, FP_θ)
 end

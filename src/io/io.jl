@@ -1,74 +1,53 @@
 """
-Input/Output module for converting tracking package outputs to SMLMData format.
+Input/Output module for loading particle tracking data.
 
-This module provides converters for popular particle tracking packages:
+This module provides a unified interface for loading tracking data from various packages:
 - **SMITE**: Single Molecule Imaging Toolbox Extraordinaire (LidkeLab)
 - **u-track**: Particle tracking software (DanuserLab)
 - **BNP-Track**: Bayesian Nonparametric Tracking (LabPresse)
+- **Particle Tracking Challenge**: Ground truth XML format
 
-All converters transform tracking results into SMLMData types (SMLD) containing
-Emitter2DFit or Emitter3DFit objects, making them compatible with SMLMMetrics
-evaluation functions.
+All loaders use multiple dispatch on format type tags and return Tracks objects
+containing Trajectory data.
 
 # Usage Example
 
 ```julia
 using SMLMMetrics
 
-# Load ground truth
-ground_truth = load_smite_2d(SmiteSMD("data/", "ground_truth.mat"))
+# Load ground truth from Particle Tracking Challenge XML
+gt_tracks = load_tracks(ChallengeFormat(), "data/ground_truth.xml", pixel_size=0.107)
 
-# Load tracking results from different packages
-smite_results = load_smite_2d(SmiteSMD("results/", "smite_tracks.mat"))
-utrack_results = load_utrack_2d(UTrackSMD("results/", "utrack_tracks.mat"))
-bnp_results = load_bnptrack_2d(BNPTrackSMD("results/", "bnp_chain.mat"))
+# Load SMITE tracking results
+smite_tracks = load_tracks(SmiteFormat(), "results/smite_tracks.mat")
 
 # Compare using metrics
-cutoff = [50.0, 50.0]  # 50 nm
-jsc_smite = jaccard(ground_truth, smite_results, cutoff)
-jsc_utrack = jaccard(ground_truth, utrack_results, cutoff)
-jsc_bnp = jaccard(ground_truth, bnp_results, cutoff)
+metrics = evaluate_tracking(gt_tracks, smite_tracks)
+println("JSC: ", metrics.JSC)
+println("α: ", metrics.α)
 ```
 
 # Exported Types
-- `SmiteSMD`, `SmiteSMLD`: SMITE data structures
-- `UTrackSMD`, `UTrackSMLD`: u-track data structures
-- `BNPTrackSMD`, `BNPTrackSMLD`: BNP-Track data structures
+- `SmiteFormat`: Format tag for SMITE data
+- `UTrackFormat`: Format tag for u-track data
+- `BNPTrackFormat`: Format tag for BNP-Track data
+- `ChallengeFormat`: Format tag for Particle Tracking Challenge XML
 
 # Exported Functions
-- `load_smite_2d`, `load_smite_3d`: Load SMITE 2D/3D tracking data
-- `load_utrack_2d`, `load_utrack_3d`: Load u-track 2D/3D tracking data
-- `load_bnptrack_2d`, `load_bnptrack_3d`: Load BNP-Track 2D/3D tracking data
+- `load_tracks(format, filepath; kwargs...)`: Unified loading function with multiple dispatch
 """
+module IO
 
-# SMITE converter
-include("smite/types.jl")
-include("smite/loading.jl")
+# Include format type definitions
+include("formats.jl")
 
-# u-track converter
-include("utrack/types.jl")
-include("utrack/loading.jl")
+# Include unified loaders
+include("loaders.jl")
 
-# BNP-Track converter
-include("bnptrack/types.jl")
-include("bnptrack/loading.jl")
+# Export format types
+export SmiteFormat, UTrackFormat, BNPTrackFormat, ChallengeFormat
 
-# Particle Tracking Challenge ground truth loader
-include("challenge/types.jl")
-include("challenge/loading.jl")
+# Export main loading function
+export load_tracks
 
-# Export SMITE types and functions
-export SmiteSMD, SmiteSMLD
-export load_smite_2d, load_smite_3d
-
-# Export u-track types and functions
-export UTrackSMD, UTrackSMLD
-export load_utrack_2d, load_utrack_3d
-
-# Export BNP-Track types and functions
-export BNPTrackSMD, BNPTrackSMLD
-export load_bnptrack_2d, load_bnptrack_3d
-
-# Export Particle Tracking Challenge types and functions
-export TrackingChallengeGT, ChallengeSMLD
-export load_challenge_gt, load_challenge_gt_2d, load_challenge_gt_3d
+end # module

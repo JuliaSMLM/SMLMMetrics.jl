@@ -46,44 +46,49 @@ function gated_distance(pos1::Union{Vector{Float64}, Nothing},
 end
 
 """
-    track_distance(track1, track2, T, gate)
+    track_distance(track1, track2, frame_start, frame_end, gate)
 
-Compute the distance between two tracks over T time points.
+Compute the distance between two tracks over a frame range.
 
 # Arguments
-- `track1::Union{Track, Nothing}`: First track or nothing (dummy)
-- `track2::Union{Track, Nothing}`: Second track or nothing (dummy)
-- `T::Int`: Total number of time points in the sequence
+- `track1::Union{Trajectory, Nothing}`: First track or nothing (dummy)
+- `track2::Union{Trajectory, Nothing}`: Second track or nothing (dummy)
+- `frame_start::Int`: First frame in the sequence
+- `frame_end::Int`: Last frame in the sequence
 - `gate::Float64`: Gate threshold ε
 
 # Returns
 - `Float64`: Sum of gated distances over all time points
 
 # Algorithm
-Distance d(θ₁, θ₂) = Σₜ ||θ₁(t) - θ₂(t)||₂,ε for t = 0, ..., T-1
+Distance d(θ₁, θ₂) = Σₜ ||θ₁(t) - θ₂(t)||₂,ε for t = frame_start, ..., frame_end
 
 # Reference
 Supplementary Note 3, "Distance Between Two Tracks" section
 """
-function track_distance(track1::Union{Track, Nothing},
-                       track2::Union{Track, Nothing},
-                       T::Int,
+function track_distance(track1::Union{Trajectory, Nothing},
+                       track2::Union{Trajectory, Nothing},
+                       frame_start::Int,
+                       frame_end::Int,
                        gate::Float64)
     # Both dummy → 0
-    if is_dummy_track(track1) && is_dummy_track(track2)
+    if is_dummy_trajectory(track1) && is_dummy_trajectory(track2)
         return 0.0
     end
 
+    # Calculate total number of frames
+    T = frame_end - frame_start + 1
+
     # One dummy → penalty for all time points
-    if is_dummy_track(track1) || is_dummy_track(track2)
+    if is_dummy_trajectory(track1) || is_dummy_trajectory(track2)
         return T * gate
     end
 
     # Both real tracks → sum gated distances over time
     total = 0.0
-    for t in 0:(T-1)
-        pos1 = get_position(track1, t)
-        pos2 = get_position(track2, t)
+    for frame in frame_start:frame_end
+        pos1 = get_position(track1, frame)
+        pos2 = get_position(track2, frame)
         total += gated_distance(pos1, pos2, gate)
     end
 
@@ -97,32 +102,35 @@ Structure holding the results of optimal track assignment.
 
 # Fields
 - `assignment::Vector{Int}`: For each GT track i, assignment[i] is the index of the paired EST track (0 = dummy)
-- `gt_tracks::Vector{Track}`: Ground truth tracks
-- `est_tracks::Vector{Track}`: Estimated tracks
-- `T::Int`: Sequence length
+- `gt_tracks::Vector{Trajectory}`: Ground truth tracks
+- `est_tracks::Vector{Trajectory}`: Estimated tracks
+- `frame_start::Int`: First frame in the sequence
+- `frame_end::Int`: Last frame in the sequence
 - `gate::Float64`: Gate parameter
 - `cost_matrix::Matrix{Float64}`: The cost matrix used for assignment
 - `total_cost::Float64`: Total cost of the optimal assignment
 """
 struct TrackPairing
     assignment::Vector{Int}
-    gt_tracks::Vector{Track}
-    est_tracks::Vector{Track}
-    T::Int
+    gt_tracks::Vector{Trajectory}
+    est_tracks::Vector{Trajectory}
+    frame_start::Int
+    frame_end::Int
     gate::Float64
     cost_matrix::Matrix{Float64}
     total_cost::Float64
 end
 
 """
-    optimal_pairing(gt_tracks, est_tracks, T, gate)
+    optimal_pairing(gt_tracks, est_tracks, frame_start, frame_end, gate)
 
 Compute the optimal pairing between ground truth and estimated tracks.
 
 # Arguments
-- `gt_tracks::Vector{Track}`: Ground truth tracks (X)
-- `est_tracks::Vector{Track}`: Estimated tracks (Y)
-- `T::Int`: Total number of time points in the sequence
+- `gt_tracks::Vector{Trajectory}`: Ground truth tracks (X)
+- `est_tracks::Vector{Trajectory}`: Estimated tracks (Y)
+- `frame_start::Int`: First frame in the sequence
+- `frame_end::Int`: Last frame in the sequence
 - `gate::Float64`: Gate threshold ε
 
 # Returns
@@ -137,21 +145,25 @@ Compute the optimal pairing between ground truth and estimated tracks.
 # Reference
 Supplementary Note 3, "Distance Between Two Track Sets" section
 """
-function optimal_pairing(gt_tracks::Vector{Track},
-                        est_tracks::Vector{Track},
-                        T::Int,
+function optimal_pairing(gt_tracks::Vector{Trajectory},
+                        est_tracks::Vector{Trajectory},
+                        frame_start::Int,
+                        frame_end::Int,
                         gate::Float64)
     n_gt = length(gt_tracks)
     n_est = length(est_tracks)
+    T = frame_end - frame_start + 1
 
     # Handle edge cases
     if n_gt == 0 && n_est == 0
-        return TrackPairing(Int[], Track[], Track[], T, gate, Matrix{Float64}(undef, 0, 0), 0.0)
+        return TrackPairing(Int[], Trajectory[], Trajectory[], frame_start, frame_end, gate,
+                           Matrix{Float64}(undef, 0, 0), 0.0)
     end
 
     if n_gt == 0
         # No GT tracks, all EST tracks are spurious
-        return TrackPairing(Int[], Track[], est_tracks, T, gate, Matrix{Float64}(undef, 0, 0), 0.0)
+        return TrackPairing(Int[], Trajectory[], est_tracks, frame_start, frame_end, gate,
+                           Matrix{Float64}(undef, 0, 0), 0.0)
     end
 
     # Build rectangular cost matrix
@@ -162,7 +174,7 @@ function optimal_pairing(gt_tracks::Vector{Track},
     # Fill costs for real track pairs
     for i in 1:n_gt
         for j in 1:n_est
-            cost_matrix[i, j] = track_distance(gt_tracks[i], est_tracks[j], T, gate)
+            cost_matrix[i, j] = track_distance(gt_tracks[i], est_tracks[j], frame_start, frame_end, gate)
         end
 
         # Cost for pairing with dummy (beyond n_est columns)
@@ -192,7 +204,8 @@ function optimal_pairing(gt_tracks::Vector{Track},
         end
     end
 
-    return TrackPairing(assignment, gt_tracks, est_tracks, T, gate, cost_matrix, total_cost)
+    return TrackPairing(assignment, gt_tracks, est_tracks, frame_start, frame_end, gate,
+                       cost_matrix, total_cost)
 end
 
 """
