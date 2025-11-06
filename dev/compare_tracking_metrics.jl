@@ -1,7 +1,7 @@
 #!/usr/bin/env julia
 """
 Compare tracking metrics from all 3 methods with comprehensive visualizations.
-Creates comparison table and plots for all 14 Chenouard measures.
+Creates comparison table and plots for all 14 SPT Challenge measures.
 """
 
 using JSON
@@ -9,8 +9,8 @@ using CairoMakie
 using Printf
 
 # Load metrics from JSON files
-metrics_dir = "../results/metrics"
-output_dir = "../results/metrics"
+metrics_dir = "results/metrics"
+output_dir = "results/metrics"
 
 println("Loading metrics from JSON files...")
 smite_data = JSON.parsefile(joinpath(metrics_dir, "smite_metrics.json"))
@@ -39,7 +39,7 @@ measure_labels = [
 # Create comparison table
 println("\n" * "=" ^ 100)
 println("COMPREHENSIVE TRACKING PERFORMANCE COMPARISON")
-println("All 14 Chenouard Measures")
+println("All 14 SPT Challenge Measures")
 println("=" ^ 100)
 println()
 
@@ -78,7 +78,7 @@ table_file = joinpath(output_dir, "comparison_table.txt")
 open(table_file, "w") do io
     println(io, "=" ^ 100)
     println(io, "COMPREHENSIVE TRACKING PERFORMANCE COMPARISON")
-    println(io, "All 14 Chenouard Measures")
+    println(io, "All 14 SPT Challenge Measures")
     println(io, "=" ^ 100)
     println(io)
 
@@ -193,7 +193,7 @@ end
 axislegend(ax5, position=:rt, orientation=:horizontal)
 
 # Add overall title
-Label(fig[0, :], "Tracking Performance Comparison: All 14 Chenouard Measures",
+Label(fig[0, :], "Tracking Performance Comparison: All 14 SPT Challenge Measures",
       fontsize=18, font=:bold)
 
 # Save figure

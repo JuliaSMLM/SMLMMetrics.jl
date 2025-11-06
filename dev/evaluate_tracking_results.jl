@@ -92,9 +92,9 @@ metrics_dir = "results/metrics"
 
 # Tracking result files
 tracking_files = Dict(
-    "smite" => joinpath(results_dir, "smite_trajectories.mat"),
-    "utrack" => joinpath(results_dir, "utrack_trajectories.mat"),
-    "bnptrack" => joinpath(results_dir, "bnptrack_trajectories.mat")
+    "smite" => joinpath(results_dir, "smite_tracking_results.mat"),
+    "utrack" => joinpath(results_dir, "utrack_tracking_results.mat"),
+    "bnptrack" => joinpath(results_dir, "bnptrack_tracking_results.mat")
 )
 
 # Create metrics directory if it doesn't exist
@@ -125,9 +125,17 @@ for (method, filepath) in tracking_files
     println("Evaluating: $(uppercase(method))")
     println("-" ^ 70)
 
-    # Load tracking results using custom loader (all files use the same custom format)
+    # Load tracking results using appropriate loader for each method
     println("Loading tracking results from: $filepath")
-    est_tracks = load_custom_trajectories(filepath)
+    if method == "smite"
+        est_tracks = load_tracks(SmiteFormat(), filepath, varname="SMD_TR")
+    elseif method == "utrack"
+        est_tracks = load_tracks(UTrackFormat(), filepath)
+    elseif method == "bnptrack"
+        est_tracks = load_tracks(BNPTrackFormat(), filepath)
+    else
+        error("Unknown tracking method: $method")
+    end
 
     println("  ✓ Loaded $(length(est_tracks.trajectories)) estimated trajectories")
     println("  Frame range: $(est_tracks.frame_range)")

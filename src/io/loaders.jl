@@ -58,7 +58,12 @@ function load_tracks(::SmiteFormat, filepath::String; varname::String="SMD", dt:
 
     # Extract metadata
     pixel_size = get(s, "PixelSize", 0.1)
-    n_frames = Int(s["NFrames"])
+    # Handle NFrames - compute from data if not present
+    n_frames = if haskey(s, "NFrames")
+        Int(s["NFrames"])
+    else
+        Int(maximum(s["FrameNum"]))
+    end
     is_3d = haskey(s, "Z")
 
     # Group localizations by track ID (ConnectID)
@@ -199,20 +204,46 @@ function load_tracks(::UTrackFormat, filepath::String; varname::String="tracksFi
     # Initialize trajectory storage
     all_trajectories = Trajectory[]
     track_id = 1
-    n_compound_tracks = length(tracksFinal)
+
+    # Handle two possible formats:
+    # 1. Standard u-track: Array of compound track structs
+    # 2. Simplified format: Single struct with tracksCoordAmpCG as matrix
+
+    is_simplified_format = isa(tracksFinal, Dict) && haskey(tracksFinal, "tracksCoordAmpCG") && isa(tracksFinal["tracksCoordAmpCG"], AbstractMatrix)
+
+    if is_simplified_format
+        # Simplified format: tracksCoordAmpCG is directly a matrix
+        coords_matrix = tracksFinal["tracksCoordAmpCG"]
+        n_compound_tracks = size(coords_matrix, 2)  # Number of tracks
+    else
+        # Standard format: Array of compound track structures
+        n_compound_tracks = length(tracksFinal)
+    end
 
     # Determine if data is 3D by checking first valid track
     is_3d = false
-    for compound_track in tracksFinal
-        if haskey(compound_track, "tracksCoordAmpCG")
-            coords_amp = vec(compound_track["tracksCoordAmpCG"])
-            if !isempty(coords_amp)
-                # Check if z-coordinates are non-zero
-                track_matrix = reshape(coords_amp, 8, :)'
-                if any(abs.(track_matrix[:, 3]) .> 1e-10)
+    if is_simplified_format
+        coords_matrix = tracksFinal["tracksCoordAmpCG"]
+        if size(coords_matrix, 2) > 0
+            first_track = coords_matrix[1, 1]
+            if isa(first_track, AbstractMatrix) && size(first_track, 2) >= 3
+                if any(abs.(first_track[:, 3]) .> 1e-10)
                     is_3d = true
                 end
-                break
+            end
+        end
+    else
+        for compound_track in tracksFinal
+            if haskey(compound_track, "tracksCoordAmpCG")
+                coords_amp = vec(compound_track["tracksCoordAmpCG"])
+                if !isempty(coords_amp)
+                    # Check if z-coordinates are non-zero
+                    track_matrix = reshape(coords_amp, 8, :)'
+                    if any(abs.(track_matrix[:, 3]) .> 1e-10)
+                        is_3d = true
+                    end
+                    break
+                end
             end
         end
     end
@@ -220,12 +251,67 @@ function load_tracks(::UTrackFormat, filepath::String; varname::String="tracksFi
     max_frame = 0
     min_frame = typemax(Int)
 
-    # Process each compound track
-    for compound_track in tracksFinal
-        if !haskey(compound_track, "tracksCoordAmpCG") || !haskey(compound_track, "tracksFeatIndxCG")
-            @warn "Compound track missing required fields, skipping"
-            continue
+    if is_simplified_format
+        # Process simplified format
+        coords_matrix = tracksFinal["tracksCoordAmpCG"]
+
+        for track_idx in 1:size(coords_matrix, 2)
+            track_data = coords_matrix[1, track_idx]
+
+            # Skip if not a matrix
+            if !isa(track_data, AbstractMatrix)
+                continue
+            end
+
+            frames = Int[]
+            x_coords = Float64[]
+            y_coords = Float64[]
+            z_coords = Float64[]
+
+            # Each row is a frame
+            for frame_idx in 1:size(track_data, 1)
+                x = track_data[frame_idx, 1]
+                y = track_data[frame_idx, 2]
+                z = is_3d ? track_data[frame_idx, 3] : 0.0
+
+                # Skip invalid positions
+                if isnan(x) || isnan(y) || isinf(x) || isinf(y)
+                    continue
+                end
+
+                push!(frames, frame_idx)
+                push!(x_coords, Float64(x))
+                push!(y_coords, Float64(y))
+                if is_3d
+                    push!(z_coords, Float64(z))
+                end
+
+                max_frame = max(max_frame, frame_idx)
+                min_frame = min(min_frame, frame_idx)
+            end
+
+            # Create trajectory if it has positions
+            if !isempty(frames)
+                traj = Trajectory(
+                    id=track_id,
+                    frames=frames,
+                    x=x_coords,
+                    y=y_coords,
+                    z=is_3d ? z_coords : nothing,
+                    dt=dt
+                )
+                push!(all_trajectories, traj)
+                track_id += 1
+            end
         end
+    else
+        # Process standard u-track format
+        # Process each compound track
+        for compound_track in tracksFinal
+            if !haskey(compound_track, "tracksCoordAmpCG") || !haskey(compound_track, "tracksFeatIndxCG")
+                @warn "Compound track missing required fields, skipping"
+                continue
+            end
 
         coords_amp = vec(compound_track["tracksCoordAmpCG"])
         track_matrix = reshape(coords_amp, 8, :)'  # n_frames × 8
@@ -304,7 +390,8 @@ function load_tracks(::UTrackFormat, filepath::String; varname::String="tracksFi
                 end
             end
         end
-    end
+    end  # end for compound_track
+    end  # end else (standard format)
 
     # Handle empty case
     if isempty(all_trajectories)
@@ -409,44 +496,33 @@ function load_tracks(::BNPTrackFormat, filepath::String; varname::String="chain"
         )
     end
 
-    # Build trajectories by grouping time points by atom assignment
-    atom_timepoints = Dict{Int, Vector{Int}}()  # atom_idx => timepoints
-    for (time_idx, atom_idx) in enumerate(K_final)
-        atom_idx_int = Int(atom_idx)
-        # Check if this atom is active
-        if atom_idx_int >= 1 && atom_idx_int <= max_particles && b_final[atom_idx_int] >= 0.5
-            if !haskey(atom_timepoints, atom_idx_int)
-                atom_timepoints[atom_idx_int] = Int[]
-            end
-            push!(atom_timepoints[atom_idx_int], time_idx)
-        end
-    end
-
-    # Create trajectories
+    # Build trajectories from active particles
+    # Each column of X/Y represents a potential particle
+    # We iterate over active particles and extract their positions across all frames
     all_trajectories = Trajectory[]
-    for (atom_idx, timepoints) in atom_timepoints
-        sort!(timepoints)  # Ensure temporal order
 
+    for particle_idx in active_particles
         frames = Int[]
         x_coords = Float64[]
         y_coords = Float64[]
         z_coords = Float64[]
 
-        for time_idx in timepoints
-            x = Float64(X_final[time_idx, atom_idx])
-            y = Float64(Y_final[time_idx, atom_idx])
+        # Extract positions across all frames for this particle
+        for frame_idx in 1:n_timepoints
+            x = Float64(X_final[frame_idx, particle_idx])
+            y = Float64(Y_final[frame_idx, particle_idx])
 
             # Skip NaN or invalid positions
             if isnan(x) || isnan(y) || isinf(x) || isinf(y)
                 continue
             end
 
-            push!(frames, time_idx)
+            push!(frames, frame_idx)
             push!(x_coords, x)
             push!(y_coords, y)
 
             if is_3d
-                z = Float64(Z_final[time_idx, atom_idx])
+                z = Float64(Z_final[frame_idx, particle_idx])
                 push!(z_coords, z)
             end
         end
@@ -454,7 +530,7 @@ function load_tracks(::BNPTrackFormat, filepath::String; varname::String="chain"
         # Create trajectory if it has positions
         if !isempty(frames)
             traj = Trajectory(
-                id=atom_idx,
+                id=particle_idx,
                 frames=frames,
                 x=x_coords,
                 y=y_coords,

@@ -69,7 +69,16 @@ function positions_match(pos1::Union{Vector{Float64}, Nothing},
         return false
     end
 
-    return norm(pos1 - pos2) < gate
+    # Handle mixed 2D/3D by comparing only XY coordinates
+    n1 = length(pos1)
+    n2 = length(pos2)
+
+    if n1 == n2
+        return norm(pos1 - pos2) < gate
+    else
+        # Mixed 2D/3D - compare only XY
+        return norm(pos1[1:2] - pos2[1:2]) < gate
+    end
 end
 
 """
@@ -137,7 +146,14 @@ function compute_position_metrics(pairing::TrackPairing)
                     if positions_match(gt_pos, est_pos, pairing.gate)
                         # Matching → TP
                         TP += 1
-                        error = norm(gt_pos - est_pos)
+                        # Handle mixed 2D/3D by comparing only XY
+                        n1 = length(gt_pos)
+                        n2 = length(est_pos)
+                        if n1 == n2
+                            error = norm(gt_pos - est_pos)
+                        else
+                            error = norm(gt_pos[1:2] - est_pos[1:2])
+                        end
                         squared_error = error^2
                         push!(squared_errors, squared_error)
                         push!(errors, error)

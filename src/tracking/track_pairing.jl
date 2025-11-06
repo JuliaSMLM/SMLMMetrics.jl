@@ -41,7 +41,18 @@ function gated_distance(pos1::Union{Vector{Float64}, Nothing},
     end
 
     # Both present → min(euclidean, gate)
-    dist = norm(pos1 - pos2)
+    # Handle mixed 2D/3D by only comparing XY coordinates
+    n1 = length(pos1)
+    n2 = length(pos2)
+
+    if n1 == n2
+        # Same dimensionality
+        dist = norm(pos1 - pos2)
+    else
+        # Mixed 2D/3D - compare only XY (first 2 coordinates)
+        dist = norm(pos1[1:2] - pos2[1:2])
+    end
+
     return min(dist, gate)
 end
 
