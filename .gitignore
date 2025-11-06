@@ -51,3 +51,16 @@ build/*
 *.mpg
 *.3gp
 *.m4v
+
+
+# MATLAB files
+*.mat
+*.fig
+*.mlx
+
+# h5 files
+*.h5
+*.hdf5
+
+
+results/
