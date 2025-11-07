@@ -82,11 +82,12 @@ function load_tracks(::SmiteFormat, filepath::String; varname::String="SMD", dt:
         # Sort by frame number
         sort!(indices, by=i -> Int(s["FrameNum"][i]))
 
-        # Extract coordinates
+        # Extract coordinates and convert to micrometers
+        # SMITE stores coordinates in units that require pixel_size/100 conversion
         frames = [Int(s["FrameNum"][i]) for i in indices]
-        x_coords = [Float64(real(s["X"][i])) for i in indices]
-        y_coords = [Float64(real(s["Y"][i])) for i in indices]
-        z_coords = is_3d ? [Float64(real(s["Z"][i])) for i in indices] : nothing
+        x_coords = [Float64(real(s["X"][i])) * pixel_size / 100.0 for i in indices]
+        y_coords = [Float64(real(s["Y"][i])) * pixel_size / 100.0 for i in indices]
+        z_coords = is_3d ? [Float64(real(s["Z"][i])) * pixel_size / 100.0 for i in indices] : nothing
 
         # Create trajectory
         traj = Trajectory(
@@ -165,7 +166,7 @@ function get_valid_indices(s::Dict, complex_indices::Dict{String, Vector{Int}})
 end
 
 """
-    load_tracks(::UTrackFormat, filepath::String; varname="tracksFinal", dt=0.01, flatten_compound=true)
+    load_tracks(::UTrackFormat, filepath::String; varname="tracksFinal", dt=0.01, pixel_size=0.1, flatten_compound=true)
 
 Load u-track tracking data and convert to Tracks format.
 
@@ -174,6 +175,7 @@ Load u-track tracking data and convert to Tracks format.
 - `filepath::String`: Path to the .mat file
 - `varname::String`: Variable name in .mat file (default: "tracksFinal")
 - `dt::Float64`: Time between frames in seconds (default: 0.01)
+- `pixel_size::Float64`: Pixel size in micrometers for coordinate conversion (default: 0.1)
 - `flatten_compound::Bool`: Split compound tracks into simple tracks (default: true)
 
 # Returns
@@ -182,16 +184,16 @@ Load u-track tracking data and convert to Tracks format.
 # Example
 ```julia
 tracks = load_tracks(UTrackFormat(), "data/tracksFinal.mat")
-tracks_3d = load_tracks(UTrackFormat(), "data/tracksFinal_3d.mat", dt=0.005)
+tracks_3d = load_tracks(UTrackFormat(), "data/tracksFinal_3d.mat", dt=0.005, pixel_size=0.108)
 ```
 
 # Notes
 - u-track stores compound tracks that may include merging/splitting events
 - Setting `flatten_compound=true` splits these into simple tracks (recommended)
 - Gap frames (NaN values) are skipped
-- Coordinates are assumed to be in microns
+- Coordinates are stored in pixels and converted to micrometers using pixel_size
 """
-function load_tracks(::UTrackFormat, filepath::String; varname::String="tracksFinal", dt::Float64=0.01, flatten_compound::Bool=true)
+function load_tracks(::UTrackFormat, filepath::String; varname::String="tracksFinal", dt::Float64=0.01, pixel_size::Float64=0.1, flatten_compound::Bool=true)
     # Load MATLAB file
     mat_data = matread(filepath)
 
@@ -280,10 +282,10 @@ function load_tracks(::UTrackFormat, filepath::String; varname::String="tracksFi
                 end
 
                 push!(frames, frame_idx)
-                push!(x_coords, Float64(x))
-                push!(y_coords, Float64(y))
+                push!(x_coords, Float64(x) * pixel_size)
+                push!(y_coords, Float64(y) * pixel_size)
                 if is_3d
-                    push!(z_coords, Float64(z))
+                    push!(z_coords, Float64(z) * pixel_size)
                 end
 
                 max_frame = max(max_frame, frame_idx)
@@ -365,10 +367,10 @@ function load_tracks(::UTrackFormat, filepath::String; varname::String="tracksFi
                     absolute_frame = first_valid_frame > 0 ? first_valid_frame + frame_offset - 1 : frame_offset
 
                     push!(frames, absolute_frame)
-                    push!(x_coords, Float64(x))
-                    push!(y_coords, Float64(y))
+                    push!(x_coords, Float64(x) * pixel_size)
+                    push!(y_coords, Float64(y) * pixel_size)
                     if is_3d
-                        push!(z_coords, Float64(z))
+                        push!(z_coords, Float64(z) * pixel_size)
                     end
 
                     max_frame = max(max_frame, absolute_frame)
@@ -403,6 +405,7 @@ function load_tracks(::UTrackFormat, filepath::String; varname::String="tracksFi
     metadata = Dict{String,Any}(
         "source" => "u-track",
         "original_file" => filepath,
+        "pixel_size" => pixel_size,
         "flatten_compound" => flatten_compound,
         "n_compound_tracks" => n_compound_tracks,
         "n_tracks" => length(all_trajectories),

@@ -11,8 +11,9 @@ The tracking module evaluates the performance of particle tracking algorithms by
 
 ## Performance Measures
 
-The module computes **5 performance measures**:
+The module computes **8 primary performance measures**:
 
+### Quality Measures
 1. **α** (alpha): Overall quality measure (0-1, higher is better)
    - Evaluates the best possible pairing between ground truth and estimated tracks
    - Accounts for both association and localization errors
@@ -23,7 +24,8 @@ The module computes **5 performance measures**:
    - β ≤ α (equality when no spurious tracks)
    - β = (d(X,∅) - d(X,Y)) / (d(X,∅) + d(Ȳ,∅))
 
-3. **JSC** (Jaccard Similarity Coefficient for positions): Association accuracy (0-1, higher is better)
+### Association Accuracy
+3. **JSC** (Jaccard Similarity Coefficient for positions): Position-level accuracy (0-1, higher is better)
    - JSC = TP / (TP + FN + FP)
    - Measures how well individual positions are matched
 
@@ -31,9 +33,20 @@ The module computes **5 performance measures**:
    - JSC_θ = TP_θ / (TP_θ + FN_θ + FP_θ)
    - Measures how well complete tracks are matched
 
-5. **RMSE** (Root Mean Square Error): Localization accuracy (lower is better)
+### Localization Accuracy
+5. **RMSE** (Root Mean Square Error): Average localization error (μm, lower is better)
    - Computed only on true positive (matching) positions
    - Measures spatial accuracy of localizations
+
+6. **RMSE_θ** (Track-averaged RMSE): Track-level localization error (μm, lower is better)
+   - RMSE computed per track, then averaged
+   - Less sensitive to track length variations
+
+7. **min_error**: Minimum localization error (μm)
+   - Best-case spatial accuracy achieved
+
+8. **max_error**: Maximum localization error (μm)
+   - Worst-case spatial accuracy (up to gate threshold)
 
 ## Supporting Counts
 
@@ -50,18 +63,20 @@ The module also provides intermediate counts useful for interpretation:
 
 ### Track Definition
 
-A track is a temporal series of spatial positions:
-- Time points are 0-indexed
-- Positions can be 2D [x, y] or 3D [x, y, z]
-- Gaps are allowed (missing positions in the temporal interval)
+A track (Trajectory) is a temporal series of spatial positions:
+- Frames are **1-indexed** (Julia standard: frame 1 is the first frame)
+- Positions can be 2D (x, y) or 3D (x, y, z) in micrometers (μm)
+- Gaps are allowed (missing frames in the temporal sequence)
+- Each trajectory has an associated time interval `dt` between frames
 
 ### Gated Distance
 
 Positions are compared using a **gated Euclidean distance**:
-- Gate parameter ε = 5.0 pixels (default, as per paper)
+- Gate parameter ε = 5.0 μm (default, as per paper)
 - Distance between positions is capped at ε
 - Positions match if distance < ε (strictly less than)
 - Missing positions receive penalty ε
+- **Note**: The gate is specified in physical units (μm), not pixels
 
 ### Optimal Pairing
 
@@ -75,31 +90,39 @@ Tracks are paired using the Hungarian algorithm to minimize total distance:
 ### Basic Example
 
 ```julia
-using SMLMMetrics.Tracking
+using SMLMMetrics
 
-# Define ground truth track
-gt_track = Track(Dict(
-    0 => [0.0, 0.0],
-    1 => [1.0, 1.0],
-    2 => [2.0, 2.0],
-    3 => [3.0, 3.0]
-))
+# Define ground truth trajectory
+gt_traj = Trajectory(
+    id=1,
+    frames=[1, 2, 3, 4],
+    x=[0.0, 1.0, 2.0, 3.0],
+    y=[0.0, 1.0, 2.0, 3.0],
+    z=nothing,  # 2D data
+    dt=0.01
+)
 
-# Define estimated track with small errors
-est_track = Track(Dict(
-    0 => [0.1, 0.1],
-    1 => [1.1, 1.1],
-    2 => [2.1, 2.1],
-    3 => [3.1, 3.1]
-))
+# Define estimated trajectory with small errors
+est_traj = Trajectory(
+    id=1,
+    frames=[1, 2, 3, 4],
+    x=[0.1, 1.1, 2.1, 3.1],
+    y=[0.1, 1.1, 2.1, 3.1],
+    z=nothing,
+    dt=0.01
+)
+
+# Create Tracks containers
+gt_tracks = Tracks([gt_traj], (1, 4), Dict{String,Any}())
+est_tracks = Tracks([est_traj], (1, 4), Dict{String,Any}())
 
 # Evaluate tracking performance
-metrics = evaluate_tracking([gt_track], [est_track])
+metrics = evaluate_tracking(gt_tracks, est_tracks)
 
 # Access results
 println("JSC: ", metrics.JSC)           # Jaccard similarity for positions
 println("JSC_θ: ", metrics.JSC_θ)       # Jaccard similarity for tracks
-println("RMSE: ", metrics.RMSE)         # Localization error
+println("RMSE: ", metrics.RMSE)         # Localization error (μm)
 println("α: ", metrics.α)               # Overall quality
 println("β: ", metrics.β)               # Quality with spurious penalty
 println("TP: ", metrics.TP)             # True positive positions
@@ -108,17 +131,15 @@ println("TP: ", metrics.TP)             # True positive positions
 ### Multiple Tracks
 
 ```julia
-# Multiple ground truth tracks
-gt_tracks = [
-    Track(Dict(0 => [0.0, 0.0], 1 => [1.0, 1.0])),
-    Track(Dict(0 => [5.0, 5.0], 1 => [6.0, 6.0]))
-]
+# Multiple ground truth trajectories
+gt_traj1 = Trajectory(id=1, frames=[1, 2], x=[0.0, 1.0], y=[0.0, 1.0], z=nothing, dt=0.01)
+gt_traj2 = Trajectory(id=2, frames=[1, 2], x=[5.0, 6.0], y=[5.0, 6.0], z=nothing, dt=0.01)
+gt_tracks = Tracks([gt_traj1, gt_traj2], (1, 2), Dict{String,Any}())
 
-# Multiple estimated tracks
-est_tracks = [
-    Track(Dict(0 => [0.1, 0.1], 1 => [1.1, 1.1])),
-    Track(Dict(0 => [5.1, 5.1], 1 => [6.1, 6.1]))
-]
+# Multiple estimated trajectories
+est_traj1 = Trajectory(id=1, frames=[1, 2], x=[0.1, 1.1], y=[0.1, 1.1], z=nothing, dt=0.01)
+est_traj2 = Trajectory(id=2, frames=[1, 2], x=[5.1, 6.1], y=[5.1, 6.1], z=nothing, dt=0.01)
+est_tracks = Tracks([est_traj1, est_traj2], (1, 2), Dict{String,Any}())
 
 metrics = evaluate_tracking(gt_tracks, est_tracks)
 ```
@@ -126,13 +147,15 @@ metrics = evaluate_tracking(gt_tracks, est_tracks)
 ### Custom Parameters
 
 ```julia
-# Specify gate parameter and sequence length
+# Specify gate parameter
 metrics = evaluate_tracking(
     gt_tracks,
     est_tracks,
-    gate = 3.0,    # Custom gate (default: 5.0 pixels)
-    T = 10         # Sequence length (default: auto-detect)
+    gate = 3.0    # Custom gate in μm (default: 5.0 μm)
 )
+
+# The sequence length (T) is automatically determined from the frame_range
+# in the Tracks objects
 ```
 
 ## Interpretation Guide
@@ -197,13 +220,14 @@ metrics = evaluate_tracking(
 
 ```
 src/tracking/
-├── tracking.jl           # Main module, exports API
-├── track_types.jl        # Track data structure and utilities
+├── Tracking.jl           # Main module file, exports API
+├── types.jl              # Trajectory and Tracks data structures with utilities
 ├── track_pairing.jl      # Distance computation and Hungarian assignment
 └── tracking_metrics.jl   # All performance measures implementation
 ```
 
 ## See Also
 
-- Main SMLMMetrics module for single-frame localization metrics
-- SMLMData package for SMLM data structures
+- `src/io/` - Data loading module for SMITE, u-track, BNP-Track formats
+- `src/io/README.md` - Documentation for loading tracking data
+- Main SMLMMetrics documentation for complete package overview

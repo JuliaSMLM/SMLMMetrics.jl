@@ -130,7 +130,7 @@ for (method, filepath) in tracking_files
     if method == "smite"
         est_tracks = load_tracks(SmiteFormat(), filepath, varname="SMD_TR")
     elseif method == "utrack"
-        est_tracks = load_tracks(UTrackFormat(), filepath)
+        est_tracks = load_tracks(UTrackFormat(), filepath, pixel_size=0.1)
     elseif method == "bnptrack"
         est_tracks = load_tracks(BNPTrackFormat(), filepath)
     else
