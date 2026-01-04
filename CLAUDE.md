@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 SMLMMetrics.jl is a Julia package for evaluating particle tracking performance in single molecule localization microscopy (SMLM) data. It implements the comprehensive performance metrics defined in Chenouard et al., "Objective comparison of particle tracking methods", Nature Methods 11, 281-289 (2014).
 
-**Version 0.3.0** is a complete rewrite focused on particle tracking evaluation (not single-frame localization metrics).
+**Version 0.2.0** is a complete rewrite focused on particle tracking evaluation (not single-frame localization metrics).
 
 ## Common Development Commands
 
