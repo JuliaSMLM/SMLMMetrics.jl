@@ -43,7 +43,7 @@ include("formats.jl")
 include("loaders.jl")
 
 # Export format types
-export SmiteFormat, UTrackFormat, BNPTrackFormat
+export SmiteFormat, UTrackFormat, BNPTrackFormat, ChallengeFormat
 
 # Export main loading function
 export load_tracks

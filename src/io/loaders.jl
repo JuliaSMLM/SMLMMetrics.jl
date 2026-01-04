@@ -6,6 +6,7 @@ all output Trajectory/Tracks types.
 """
 
 using MAT
+using LightXML
 
 # Import types from tracking module
 using ..Tracking: Trajectory, Tracks
@@ -565,6 +566,126 @@ function load_tracks(::BNPTrackFormat, filepath::String; varname::String="chain"
     if haskey(chain, "stride")
         metadata["chain_stride"] = chain["stride"]
     end
+
+    return Tracks(
+        trajectories=all_trajectories,
+        frame_range=(min_frame, max_frame),
+        metadata=metadata
+    )
+end
+
+"""
+    load_tracks(::ChallengeFormat, filepath::String; pixel_size=0.1, dt=0.01)
+
+Load Particle Tracking Challenge ground truth XML files.
+
+# Arguments
+- `format::ChallengeFormat`: Format specifier
+- `filepath::String`: Path to the XML file
+- `pixel_size::Float64`: Pixel size in micrometers for coordinate conversion (default: 0.1)
+- `dt::Float64`: Time between frames in seconds (default: 0.01)
+
+# Returns
+- `Tracks`: Tracking dataset with trajectories
+
+# Example
+```julia
+gt_tracks = load_tracks(ChallengeFormat(), "ground_truth.xml", pixel_size=0.107)
+```
+
+# Notes
+- Frame numbers are converted from 0-indexed (Challenge format) to 1-indexed (Julia)
+- Coordinates are converted from pixels to micrometers using pixel_size
+- The XML format uses `<particle>` elements containing `<detection>` elements
+- Each detection has attributes: t (frame), x, y, and optionally z
+"""
+function load_tracks(::ChallengeFormat, filepath::String; pixel_size::Float64=0.1, dt::Float64=0.01)
+    # Parse XML file
+    xdoc = parse_file(filepath)
+    xroot = root(xdoc)
+
+    # Find all particle elements
+    particles = get_elements_by_tagname(xroot, "particle")
+
+    all_trajectories = Trajectory[]
+    min_frame = typemax(Int)
+    max_frame = 0
+
+    for (track_id, particle) in enumerate(particles)
+        # Get all detections for this particle
+        detections = get_elements_by_tagname(particle, "detection")
+
+        if isempty(detections)
+            continue
+        end
+
+        frames = Int[]
+        x_coords = Float64[]
+        y_coords = Float64[]
+        z_coords = Float64[]
+        is_3d = false
+
+        for detection in detections
+            # Get attributes
+            t = parse(Int, attribute(detection, "t")) + 1  # Convert 0-indexed to 1-indexed
+            x = parse(Float64, attribute(detection, "x")) * pixel_size
+            y = parse(Float64, attribute(detection, "y")) * pixel_size
+
+            # Check for z coordinate
+            z_attr = attribute(detection, "z"; required=false)
+            if z_attr !== nothing
+                is_3d = true
+                z = parse(Float64, z_attr) * pixel_size
+                push!(z_coords, z)
+            end
+
+            push!(frames, t)
+            push!(x_coords, x)
+            push!(y_coords, y)
+
+            min_frame = min(min_frame, t)
+            max_frame = max(max_frame, t)
+        end
+
+        # Sort by frame number (in case detections are not ordered)
+        if !issorted(frames)
+            perm = sortperm(frames)
+            frames = frames[perm]
+            x_coords = x_coords[perm]
+            y_coords = y_coords[perm]
+            if is_3d
+                z_coords = z_coords[perm]
+            end
+        end
+
+        # Create trajectory
+        traj = Trajectory(
+            id=track_id,
+            frames=frames,
+            x=x_coords,
+            y=y_coords,
+            z=is_3d ? z_coords : nothing,
+            dt=dt
+        )
+        push!(all_trajectories, traj)
+    end
+
+    # Free XML document
+    free(xdoc)
+
+    # Handle empty case
+    if isempty(all_trajectories)
+        min_frame = 1
+        max_frame = 1
+    end
+
+    # Create metadata
+    metadata = Dict{String,Any}(
+        "source" => "Particle Tracking Challenge",
+        "original_file" => filepath,
+        "pixel_size" => pixel_size,
+        "n_tracks" => length(all_trajectories)
+    )
 
     return Tracks(
         trajectories=all_trajectories,

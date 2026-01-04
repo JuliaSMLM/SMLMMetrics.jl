@@ -59,8 +59,8 @@ using MAT
 using LightXML
 
 # Include submodules
-include("tracking/Tracking.jl")
-include("io/IO.jl")
+include("tracking/tracking.jl")
+include("io/io.jl")
 
 # Re-export from Tracking module
 using .Tracking
