@@ -15,8 +15,8 @@ SMLMMetrics.jl is a Julia package for evaluating particle tracking performance i
 # Run full test suite
 julia --project=. -e "using Pkg; Pkg.test()"
 
-# Interactive development (use dev/ directory)
-julia --project=dev
+# Run tests interactively
+julia --project=. -e "include(\"test/runtests.jl\")"
 ```
 
 ### Documentation
@@ -68,21 +68,27 @@ julia --project=. -e "using Pkg; Pkg.update()"
 - `load_tracks(format, filepath; kwargs...)` - Load tracking data from various formats
 
 ### Supported Data Formats
-- **SMITE** - Single Molecule Imaging Toolbox Extraordinaire (.mat) - implemented
-- **u-track** - Danuser Lab tracking software (.mat) - implemented
-- **BNP-Track** - Bayesian Nonparametric Tracking (.mat) - implemented
+- **SMITE** - Single Molecule Imaging Toolbox Extraordinaire (.mat)
+- **u-track** - Danuser Lab tracking software (.mat)
+- **BNP-Track** - Bayesian Nonparametric Tracking (.mat)
+- **Challenge** - Particle Tracking Challenge ground truth (.xml)
 
 ### Dependencies
 - `Hungarian` - Hungarian algorithm for optimal track pairing
 - `MAT` - MATLAB file support for SMITE/u-track/BNP-Track
 - `LightXML` - XML parsing for Challenge format
-- `LinearAlgebra` - Vector/matrix operations
-- `Statistics` - Mean, variance calculations
 
 ## Development Workflow
 
 ### Interactive Development
-Use the `dev/` directory with Revise.jl for interactive development. This directory contains development-specific dependencies like CairoMakie for plotting.
+Use the `dev/` directory with Revise.jl for interactive development:
+```bash
+julia --project=dev
+```
+This directory contains development-specific dependencies (CairoMakie for plotting) and example scripts:
+- `evaluate_tracking_results.jl` - Full evaluation workflow example
+- `compare_tracking_metrics.jl` - Compare multiple tracking methods
+- `check_utrack_detections.jl` - Validate u-track loader output
 
 ### CI/CD Pipeline
 - GitHub Actions runs tests on Julia 1.6, 1.8, and nightly
@@ -93,7 +99,7 @@ Use the `dev/` directory with Revise.jl for interactive development. This direct
 ### Code Style
 Follow standard Julia package conventions. The codebase uses:
 - Modular design with submodules (Tracking, IO)
-- Capitalized module files (Tracking.jl, IO.jl, types.jl)
+- Capitalized module files (Tracking.jl, IO.jl) with lowercase supporting files (types.jl, formats.jl)
 - 1-indexed frames (Julia standard, converted from 0-indexed Challenge format automatically)
 - All coordinates in micrometers (μm), not pixels
 - DocStrings for all exported types and functions
@@ -132,6 +138,9 @@ tracks = load_tracks(UTrackFormat(), "tracksFinal.mat")
 
 # Load BNP-Track results
 tracks = load_tracks(BNPTrackFormat(), "chain.mat")
+
+# Load Particle Tracking Challenge ground truth
+gt_tracks = load_tracks(ChallengeFormat(), "ground_truth.xml", pixel_size=0.107)
 ```
 
 ### Evaluating Tracking
