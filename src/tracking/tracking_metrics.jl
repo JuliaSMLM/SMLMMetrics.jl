@@ -49,6 +49,17 @@ struct TrackingMetrics
     FP_θ::Int
 end
 
+function Base.show(io::IO, m::TrackingMetrics)
+    r(x) = round(x; digits=4)
+    println(io, "TrackingMetrics:")
+    println(io, "  Quality:  α = $(r(m.α)),  β = $(r(m.β))")
+    println(io, "  Jaccard:  JSC = $(r(m.JSC)),  JSC_θ = $(r(m.JSC_θ))")
+    println(io, "  RMSE:     overall = $(r(m.RMSE)),  per-track = $(r(m.RMSE_θ))")
+    println(io, "            min = $(r(m.min_error)),  max = $(r(m.max_error))")
+    println(io, "  Counts:   TP = $(m.TP),  FN = $(m.FN),  FP = $(m.FP)")
+    print(io,   "  Tracks:   TP_θ = $(m.TP_θ),  FN_θ = $(m.FN_θ),  FP_θ = $(m.FP_θ)")
+end
+
 """
     positions_match(pos1, pos2, gate)
 
